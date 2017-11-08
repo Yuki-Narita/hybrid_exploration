@@ -1,5 +1,5 @@
 # hybrid_exploration
-testing on the turtlebot with SLAM <br><br>
+* testing on the turtlebot with SLAM <br><br>
 
 ## run(after activating turtlebot and SLAM) <br>
 * hybrid exploration

@@ -214,8 +214,20 @@ target_link_libraries(hybrid_sensor_based_exploration ${catkin_LIBRARIES})
 add_executable(hybrid_vector_explore_program src/vector_explore_program.cpp)
 target_link_libraries(hybrid_vector_explore_program ${catkin_LIBRARIES})
 
-##add_executable(new_hybrid_vector_explore_program src/new_vector_explore_program.cpp)
-##target_link_libraries(new_hybrid_vector_explore_program ${catkin_LIBRARIES})
+add_executable(hybrid_new_vector_explore_program src/new_vector_explore_program.cpp)
+target_link_libraries(hybrid_new_vector_explore_program ${catkin_LIBRARIES})
 
 add_executable(data_export src/data_export.cpp)
 target_link_libraries(data_export ${catkin_LIBRARIES})
+
+add_executable(hybrid_odometry_on_map src/odometry_on_map.cpp)
+target_link_libraries(hybrid_odometry_on_map ${catkin_LIBRARIES})
+
+add_executable(hybrid_odom_support src/odom_support.cpp)
+target_link_libraries(hybrid_odom_support ${catkin_LIBRARIES})
+
+add_executable(hybrid_bumper_hit src/bumper_hit.cpp)
+target_link_libraries(hybrid_bumper_hit ${catkin_LIBRARIES})
+
+add_executable(hybrid_new_sensor_based_exploration src/new_sensor_based_exploration.cpp)
+target_link_libraries(hybrid_new_sensor_based_exploration ${catkin_LIBRARIES})

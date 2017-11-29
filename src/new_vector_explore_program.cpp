@@ -676,7 +676,7 @@ void approx(std::vector<float> &scan){
 	//左端がnanのとき
 				if(isnan(depth1)){
 					for(int k=0;k<count+1;k++)
-						scan[j-k]=0.01;//depth2;
+						scan[j-k]=depth2;//0.01;//depth2;
 				}
 				else{
 					for(int k=0;k<count;k++)
@@ -689,9 +689,16 @@ void approx(std::vector<float> &scan){
 	//右端がnanのとき
 		if(j==(scan.size()-1)-1 &&isnan(scan[j+1])){
 			for(int k=0;k<count;k++)
-				scan[j+1-k]=0.01;//depth1;
+				scan[j+1-k]=depth1;//0.01;//depth1;
 			//ROS_INFO("val|nan|nan|:nancount=%d",count);
 			count=0;
+		}
+	}
+
+	if(isnan(scan[0])){
+		scan[0] = scan[1] - (scan[2] - scan[1]);
+		if(scan[0] < 0){
+			scan[0] = 0;
 		}
 	}
 }
@@ -757,6 +764,10 @@ void VFH_navigation(float goal_x, float goal_y){
 	const float goal_margin = 0.7;
 	bool finish_flag = false;
 	float now2goal_dis;
+
+	goal_point_x = 1.7;
+	goal_point_y = -0.7;
+
 
 	std::cout << "目標へ移動開始" << std::endl;
 	std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;

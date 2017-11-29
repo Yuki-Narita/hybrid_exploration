@@ -231,3 +231,6 @@ target_link_libraries(hybrid_bumper_hit ${catkin_LIBRARIES})
 
 add_executable(hybrid_new_sensor_based_exploration src/new_sensor_based_exploration.cpp)
 target_link_libraries(hybrid_new_sensor_based_exploration ${catkin_LIBRARIES})
+
+add_executable(new_hybrid_exploration src/new_hybrid_exploration.cpp)
+target_link_libraries(new_hybrid_exploration ${catkin_LIBRARIES})

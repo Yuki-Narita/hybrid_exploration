@@ -3,6 +3,9 @@
 #include <ros/callback_queue.h>
 #include <fstream>
 #include <geometry_msgs/Twist.h>
+#include <tf/transform_listener.h>
+#include <nav_msgs/Odometry.h>
+#include <tf/transform_datatypes.h>
 #include <tf2_msgs/TFMessage.h>
 #include <visualization_msgs/Marker.h>
 #include <kobuki_msgs/BumperEvent.h>
@@ -70,10 +73,12 @@ float odom_y;//オドメトリy
 double yaw;//ヨー角
 std::vector<float> odom_log_x;//オドメトリxの履歴を保存
 std::vector<float> odom_log_y;//オドメトリyの履歴を保存
+double pre_rotate;//前回の分岐に回転した方向
 
 int loop_count = 0;
 float pre_loop_x = 0;
 float pre_loop_y = 0;
+ros::Time start;
 
 float pre_theta = 0;
 
@@ -90,25 +95,37 @@ const float forward_vel = 0.2;//前進速度[m/s]
 const float rotate_vel = 0.5;//回転速度[rad\s]
 //VFH関連のパラメータ///
 const float scan_threshold = 0.5;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
+const float robot_diameter = 0.40;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
 const float forward_dis = 0.5;//一回のVFHで前方向に進む距離[m]
 const int div_num = 2;//VFHでカーブを行うときに目的地までの距離を分割する数(偶数)
 const float back_vel = -0.2;//VFHで全部nanだったときの後退速度[m/s]
 const float back_time = 0.5;//VFHで全部nanだったときに後退する時間[s]
+const float not_exist_rotate_time = 0.2;//VFHで全部nanだったときに回転する時間[s]
+const int go_back_odom = 6;//VFHで全部nanのときの回転方向計算で進行方向を求めるときのオドメトリを遡る個数+1
 //分岐領域関連のパラメータ///
 const float Branch_threshold = 1.0;//分岐領域の判断をする距離差の閾値[m]
 const float Branch_range_limit = 5.0;//分岐領域の判断を行う距離の最大値(分岐がこの値以上遠くにあっても認識しない)[m]
 const float branch_obst_limit = 1.0;//スキャンデータの中心がこの値以下のとき分岐領域を検出しない[m]
 const float fix_sensor = 0.07;//分岐領域座標設定のときにセンサーから取れる距離の誤差を手前に補正(センサー値からマイナスする)[m]
+const float rotation_error = 0.09*6;//分岐方向への回転で微妙に回転しすぎるため補正をかける(この値だけ回転角を減らす)(5[deg]*定数)[rad]
+const float after_rotate_forward = 1.5;//回転直後に壁があった時に角度を戻したあとどれくらい進むか[m]
 //重複探査関連のパラメータ///
 const float duplication_margin = 0.3;//重複探査の判断をするときの半径[m]←正方形の辺の半分の長さでした
 
 
+
+
+const float right_angle = (PI/2) - rotation_error;//分岐領域への回転などで使う直角の角度
+const float defalt_rotate_yaw = 0.87;//分岐方向への回転をセンサデータから行うときの最小限回る角度
 const float scan_branch_limit = 1.5;//分岐方向への回転をセンサデータから行うときにこの値以上だったら数値があっても良い
 const float branch_y_threshold = 2.0;//分岐領域の2点間のｙ座標の差がこの値以下のとき分岐として検出
+const float nothingness_vel = 0.01;//虚無の速度[m/s]
 
 float scan_angle;//この角度の範囲内に空間があれば回転を終了する
 
+const float branch_rotate_scan_angle = 0.09;//スキャンデータから分岐回転終了を決定のに必要な空間の角度、この値の±を見る[rad]
 const float branch_angle = 0.04;//分岐領域を検出するのに必要な障害物がない空間の角度
+const float scan_branch_end = PI/2 + 0.17;//スキャンデータからの分岐回転終了を決めるときの最大回転角
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
 const int loop_closing_max = 10;//プログラムを切り替えるために必要なループクロージングの回数
 
@@ -117,7 +134,37 @@ bool AI_wakeup = false;//AIの起動演出をするかどうか
 bool branch_find_flag = false;//分岐領域があるかどうか
 bool need_back = true;//全部nanだったときに最初だけバックする
 bool need_rotate_calc = true;//全部nanだったときの回転方向を計算する必要があるか
+bool first_move = true;//多分最初の移動だけ摩擦の関係で速度がちゃんと送れないので補正する
+bool after_rotate = false;//分岐方向に回転した直後壁があったらもう少し進む
 bool scan_rotation_ok = false;//スキャンデータからの分岐回転を終了していいか
+
+
+/*functions*/
+void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg);//VFHで移動方向を決定する
+void approx(std::vector<float> &scan);//VFHのときに使うスキャンデータのnanを線形近似で補正
+float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_increment, float all_nan);//VFHの移動角を計算
+void vel_after_rotate();//分岐方向に回転した直後にVFHで全部nanだったときの特殊処理
+void vel_recovery();//VFHで全部nanだったときのリカバリ処理
+float rotation_direction();//VFHで全部nanだったときに回転する向きを決定する
+void vel_curve_VFH(float rad_min);//VFHで移動する速度を送る
+void Branch_area_callback(const sensor_msgs::LaserScan::ConstPtr& Branch_msg);//分岐領域の処理を行う
+void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_angle);//分岐領域の検索
+void VFH4vel_publish_Branch();//分岐領域へ向かう命令を送る
+void duplicated_point_detection();//重複探査の判断を行う
+//void odom_callback(const nav_msgs::Odometry::ConstPtr& odom_msg);//オドメトリを取得
+void AI_Wakeup_Performance();//AIの起動演出
+void branch_rotate_odom(double y, float d_rot, float rotation_angle);//オドメトリから取得したヨー角の変化が一定値(設定済み)を超えるまで回転する
+void branch_forward(float start_x, float start_y, float goal);//指定した距離だけVFHで進む
+void branch_rotate_scan();//分岐方向への回転をスキャンデータ
+void scan_branch_callback(const sensor_msgs::LaserScan::ConstPtr& scan_Branch_msg);//スキャンデータの中心の値から回転終了の判断をする
+void nothingness_input();//虚無の入力
+
+/*
+void export_data2(float i, float range){
+	std::ofstream ofs("scan_resize_test.csv",std::ios::app);
+	ofs << i << "," << range << std::endl;
+}
+*/
 
 void odom_marking(float x, float y){
 	geometry_msgs::Point marking;
@@ -205,6 +252,8 @@ void display_gravity(float x, float y){
 	marker_pub.publish(marker2);
 }
 
+
+
 void export_data(float i, float range){
 	std::ofstream ofs("odom.csv",std::ios::app);
 	ofs << i << "," << range << std::endl;
@@ -231,6 +280,24 @@ void tf_callback(const tf2_msgs::TFMessage::ConstPtr& tf_data){
 	}
 }
 
+
+
+
+void nothingness_input(){
+	vel.angular.z = 0;
+	vel.linear.x = 0;
+	vel_pub.publish(vel);
+	vel.angular.z = 0;
+	vel.linear.x = nothingness_vel;
+	vel_pub.publish(vel);
+	vel.angular.z = 0;
+	vel.linear.x = 0;
+	vel_pub.publish(vel);
+
+	//sleep(1.0);
+}
+
+
 void scan_branch_callback(const sensor_msgs::LaserScan::ConstPtr& scan_Branch_msg){
 	std::vector<float> ranges = scan_Branch_msg->ranges;
 	float angle_increment = scan_Branch_msg->angle_increment;
@@ -251,6 +318,178 @@ void scan_branch_callback(const sensor_msgs::LaserScan::ConstPtr& scan_Branch_ms
 
 	scan_rotation_ok = true;
 	std::cout << "rotation_true(debag)" << std::endl;
+
+	//scan_rotation_ok = true;
+
+	/*if(isnan(ranges[ranges.size()/2]) || ranges[ranges.size()/2] > scan_branch_limit){
+		scan_rotation_ok = true;
+	}*/
+
+}
+
+
+
+
+//分岐方向への回転をスキャンで決める
+void branch_rotate_scan(){
+
+	double y;	
+	double y2;
+	double old_y2;
+	bool change_sign = false;
+	bool if_finish = true;
+
+	odom_queue.callOne(ros::WallDuration(1));
+
+	y = yaw;
+
+	std::cout << "スキャンデータから回転の終了を決定" << std::endl;
+
+	//スキャンデータの中心に値が出ないもしくは閾値以上に大きい値がくるまで回る
+	//分岐を見つけた時点では中心が条件を満たしているので最初に少しは回転させないとだめかも
+	branch_rotate_odom(y,goal_y,defalt_rotate_yaw);//最小限の回転
+
+	odom_queue.callOne(ros::WallDuration(1));
+	y2 = yaw;
+
+	scan_angle = branch_rotate_scan_angle;
+
+	while(!scan_rotation_ok && ros::ok()){
+		scan_branch_queue.callOne(ros::WallDuration(1));
+		if(!scan_rotation_ok){
+			vel_pub.publish(vel);
+		}
+		//scan_rotation_ok = true;
+		if(!change_sign){
+			old_y2 = y2;
+		}
+		odom_queue.callOne(ros::WallDuration(1));
+		y2 = yaw;
+		std::cout << y << "," << y2 << "," << old_y2  << "," << change_sign << "(debag)" << std::endl;
+		if(vel.angular.z < 0){
+			if(y2 - old_y2 > PI){
+				change_sign = true;
+				y2 = -2*PI + y2; 
+			}
+		}
+		else{
+			if(y2 -old_y2 < -PI){
+				change_sign = true;
+				y2 = 2*PI + y2; 
+			}
+		}
+		std::cout << y << "," << y2 << "," << old_y2 << "," << change_sign << "(debag)" << std::endl;
+		std::cout << "*****分岐領域発見時からの回転角度 " << y2-y << " [rad] *****" << std::endl;
+		if(if_finish && std::abs(y2-y) > scan_branch_end){
+			std::cout << "逆回転" << std::endl;
+			vel.angular.z *= -1;
+			if_finish = false;
+		}
+	}
+	scan_rotation_ok = false;
+}
+
+//分岐方向への回転をオドメトリで決める
+void branch_rotate_odom(double y, float d_rot, float rotation_angle){
+	//const float rotation_angle = (PI/2) - rotation_error;
+	double y2;
+	double old_y2;
+	bool change_sign = false;
+
+	odom_queue.callOne(ros::WallDuration(1));
+	
+	y2 = yaw;
+
+	vel.linear.x = 0;
+
+	if(d_rot < 0){
+		std::cout << "-(debag)" << std::endl;
+		vel.angular.z = -rotate_vel;
+		std::cout << goal_y << "," << y << "," << y2 << "(debag)" << std::endl;
+		while((-rotation_angle - (y2-y)) < 0 && ros::ok()){
+			vel_pub.publish(vel);
+
+			if(!change_sign){
+				old_y2 = y2;
+			}	
+			odom_queue.callOne(ros::WallDuration(1));
+			y2 = yaw;
+			if(y2 - old_y2 > PI){
+				change_sign = true;
+				y2 = -2*PI + y2; 
+			}
+			std::cout << "*****分岐領域発見時からの回転角度 " << y2-y << " [rad] *****" << std::endl;
+		}
+	}
+	else{
+		std::cout << "+(debag)" << std::endl;
+		vel.angular.z = rotate_vel;
+		std::cout << goal_y << "," << y << "," << y2 << "(debag)" << std::endl;
+		while((rotation_angle - (y2-y)) > 0 && ros::ok()){
+			vel_pub.publish(vel);
+
+			if(!change_sign){
+				old_y2 = y2;
+			}
+			odom_queue.callOne(ros::WallDuration(1));
+			y2 = yaw;
+
+			if(y2 -old_y2 < -PI){
+				change_sign = true;
+				y2 = 2*PI + y2; 
+			}
+			std::cout << "*****分岐領域発見時からの回転角度 " << y2-y << " [rad] *****" << std::endl;
+		}
+	}
+}
+
+//分岐まで前進(goalで指定した距離だけ前進)
+void branch_forward(float start_x, float start_y, float goal){
+
+	float odom_abs = 0;
+
+
+	std::cout << "(" << start_x << "," << start_y << ")" << std::endl;	
+
+	std::cout << "***** スタート (" << odom_abs << ") , ゴール  ("<< goal_x << ") *****" << std::endl;
+	
+	while ((goal - odom_abs) > 0 && ros::ok()){
+
+		VFH_queue.callOne(ros::WallDuration(1));
+
+		std::cout << "(" << odom_x << "," << odom_y << ")" << std::endl;	
+
+		odom_abs = std::max(std::abs(odom_x - start_x),std::abs(odom_y - start_y));
+
+		std::cout << "***** 現在地  (" << odom_abs << ") , ゴール  ("<< goal << ") *****" << std::endl;
+   	 }
+}
+
+void vel_after_rotate(){
+	double y;
+
+	odom_queue.callOne(ros::WallDuration(1));
+
+	y = yaw;
+
+	std::cout << "分岐方向に障害物があったのでもう少し回ります" << std::endl;
+	
+	scan_angle = obst_recover_angle;
+	//vel.angular.z *= -1;
+
+	while(!scan_rotation_ok && ros::ok()){
+		scan_branch_queue.callOne(ros::WallDuration(1));//scan_angleに設定した角度の範に空間ができるまで回転する
+		if(!scan_rotation_ok){
+			vel_pub.publish(vel);
+		}
+	}
+
+	scan_rotation_ok = false;
+
+	//branch_rotate_odom(y,pre_rotate,right_angle);
+	//回転終了の判断に使う角度を渡してその間回ってくれる関数
+
+	std::cout << "はい!OK" << std::endl;
 }
 
 void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_angle){
@@ -524,6 +763,67 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 	return rad_min;
 }
 
+/*
+float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_increment, float all_nan){
+	float rad_start;
+	float rad_end;
+	float rad_diff;
+	float rad_chord;
+	float rad_center;
+	float rad_center_abs;
+	float rad_min_abs = all_nan;
+	float rad_min = all_nan;
+	int i;
+	
+
+	for(i=0;i<ranges.size();i++){
+		//export_data(angle_min+(angle_increment*i),ranges[i]);
+		if(isnan(ranges[i])){
+			if(isnan(ranges[i+1])){
+				ranges[i] = 0;
+			}
+			else{
+				ranges[i] = ranges[i+1];
+			}
+		}
+		if(ranges[i] >= scan_threshold){
+			ranges[i] = scan_threshold;		
+		}
+	}
+
+	i = 0;
+
+	while(i<ranges.size() && ros::ok()){
+		if(ranges[i] == scan_threshold){
+			rad_start = angle_min+(angle_increment*i);
+			while(ranges[i] == scan_threshold && ros::ok()){
+				i++;		
+			}
+			rad_end = angle_min+(angle_increment*(i-1));
+			
+			rad_diff = rad_end - rad_start;
+			
+			rad_chord = 2 * scan_threshold * sin(rad_diff/2);
+
+			if(rad_chord >= robot_diameter){
+				rad_center = (rad_start+rad_end)/2;
+				rad_center_abs = std::abs(rad_center);
+				if(rad_center_abs<rad_min_abs){
+					rad_min_abs = rad_center_abs;
+					rad_min = rad_center;
+				}
+			}			
+		}
+		else{
+			i++;
+		}
+	}
+
+
+	
+	return rad_min;
+}
+*/
 void AI_Wakeup_Performance(){
 	std::cout << "「Sensor-Based Exploration Proglam Start」" << std::endl;
 	sleep(0.25);
@@ -537,6 +837,50 @@ void AI_Wakeup_Performance(){
 	sleep(0.5);
 	std::cout << "それじゃあさっそく地図作成・・・スタート!!" << std::endl;
 	sleep(0.5);
+}
+
+float rotation_direction(){
+	int odom_num = odom_log_x.size();
+	float oldest_x = odom_log_x[odom_num-go_back_odom];
+	float oldest_y = odom_log_y[odom_num-go_back_odom];
+	float var_x;
+	float var_y;
+	float abs_var_x;
+	float abs_var_y;
+
+
+	//xとｙのどちらが大きく変動したかを確認
+	var_x = odom_x - oldest_x;
+	var_y = odom_y - oldest_y;
+
+	abs_var_x = std::abs(var_x);
+	abs_var_y = std::abs(var_y);
+/*
+	std::cout << "回転セレクトタイム" << std::endl;
+	std::cout << odom_num << std::endl;
+	std::cout << odom_x << "," << odom_y << "," << oldest_x << "," << oldest_y  << std::endl;
+	std::cout << var_x << "," << var_y << "," << abs_var_x << "," << abs_var_y << std::endl;
+*/
+	if(abs_var_x >= abs_var_y){
+		if(var_x * var_y >= 0){
+			//std::cout << "x-" << std::endl;
+			return -rotate_vel;
+		}
+		else{
+			//std::cout << "x+" << std::endl;
+			return rotate_vel;
+		}
+	}
+	else{
+		if(var_x * var_y >= 0){
+			//std::cout << "y+" << std::endl;
+			return rotate_vel;
+		}
+		else{
+			//std::cout << "y-" << std::endl;
+			return -rotate_vel;
+		}
+	}
 }
 
 void odom_callback(const geometry_msgs::Point::ConstPtr& odom_msg){
@@ -615,6 +959,12 @@ void vel_recovery(){
 
 		scan_rotation_ok = false;
 	}
+	//ros::Duration duration(not_exist_rotate_time);
+
+	/*set_time = ros::Time::now();	
+	while(ros::Time::now()-set_time < duration){
+		vel_pub.publish(vel);
+	}*/
 }
 
 
@@ -624,26 +974,24 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	
 	float y = origin_dis*pow(cos(rad_min),2);
 	bool d = true;	
-	/*
+	
 	if(std::abs(rad_min) > (angle_max/2)){
 		y = side_dis * cos(rad_min) / std::abs(sin(rad_min));
 		std::cout << "y_side: " << y << std::endl;
 		d = false;
 	}
-	*/
 	float y_div = y/div_num;
 	float rho;
 	float theta_rho;
 	float omega;
-	float t = 0.5;
+	float t;
 
 	pre_theta = theta;
 
 	theta_rho = 2*theta;
 	rho = y_div/sin(theta_rho);
-	//omega = v/rho;
-	omega = theta_rho/t;
-	//t = theta_rho/omega;
+	omega = v/rho;
+	t = theta_rho/omega;
 
 	vel.linear.x = v;
 	vel.angular.z = omega;
@@ -659,14 +1007,85 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 		}
 		std::cout << "障害物を回避しながら移動中♪" << std::endl;
 	}
+}
+
+/*
+void vel_curve_VFH(float rad_min){
+	const float theta = rad_min;
+	const float y = forward_dis;
+	const float v = forward_vel;
+	
+	float y_div = y/div_num;
+	float rho;
+	float theta_rho;
+	float omega;
+	float t;
+	float t_plus;
+
+	pre_theta = theta;
+
+	theta_rho = 2*theta;
+	rho = y_div/sin(theta_rho);
+	omega = v/rho;
+	t = theta_rho/omega;
+
+	//if(first_move){
+	if(true){
+		t_plus = t + 0.6;//最初に送る速度命令はdelayがあるので時間を足す(いらない？
+		first_move = false;
+	}
+	else{
+		t_plus = t;
+	}	
+
+
+	//虚無のパブリッシュ///
+	nothingness_input();
+
+	vel.linear.x = v;
+	minus_vel.linear.x = v;
+	vel.angular.z = omega;
+	minus_vel.angular.z = -omega;
+
+	std::cout << theta << "(theta_debag)" << std::endl;
+	std::cout << t << "(t_debag)" << std::endl;
+	
+	ros::Duration duration_curve(t_plus);//時間増やしたバージョン
+	ros::Duration duration_curve_minus(t);
+
+
+
+	
+	for(int i=0;i<div_num/2;i++){
+		set_time = ros::Time::now();
+		while(ros::Time::now()-set_time < duration_curve){
+			vel_pub.publish(vel);
+		}
+		std::cout << "障害物を回避しながら移動中♪" << std::endl;
+
+		//虚無のパブリッシュ///
+		nothingness_input();
+
+		set_time = ros::Time::now();
+		while(ros::Time::now()-set_time < duration_curve_minus){
+			vel_pub.publish(minus_vel);
+		}
+	}
+
+	//オドメトリを保存//
 
 	odom_queue.callOne(ros::WallDuration(1));
-	
+
+	//std::cout << "(" << odom_x << "," << odom_y << ")" << std::endl;	
 
 	odom_log_x.push_back(odom_x);
 	odom_log_y.push_back(odom_y);
 
+	export_data(odom_x,odom_y);
+	////////////////
+	
 }
+*/
 
 //重複探査検出用
 void duplicated_point_detection(){
@@ -1143,7 +1562,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 
 
 void VFH4vel_publish_Branch(){
-	const float goal_margin = 0.3;
+	const float goal_margin = 0.7;
 	bool finish_flag = false;
 	float now2goal_dis;
 
@@ -1153,6 +1572,8 @@ void VFH4vel_publish_Branch(){
 	goal_point_x = odom_x + cos(yaw)*goal_x - sin(yaw)*goal_y;
 	goal_point_y = odom_y + sin(yaw)*goal_x + cos(yaw)*goal_y;
 
+	//goal_point_x = 1.7;
+	//goal_point_y = -0.7;
 
 	std::cout << "目標へ移動開始" << std::endl;
 	std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
@@ -1179,6 +1600,49 @@ void VFH4vel_publish_Branch(){
 
 }
 
+/*旧バージョン
+void VFH4vel_publish_Branch(){
+	double y;
+	double y2;
+	float start_x;
+	float start_y;
+	float odom_abs;
+	double old_y2;
+	bool change_sign = false;
+
+
+	odom_queue.callOne(ros::WallDuration(1));
+
+	std::cout << "(" << odom_x << "," << odom_y << ")" << std::endl;	
+
+	start_x = odom_x;
+	start_y = odom_y;
+	y = yaw;
+
+	std::cout << "分岐地点にいっくよ〜〜!" << std::endl;
+
+	branch_forward(start_x,start_y,goal_x);
+
+	std::cout << "ふぅ〜、やっと着いた" << std::endl;
+
+	std::cout << "それじゃあ分岐方向に回転するね!" << std::endl;
+
+
+	//branch_rotate_odom(y,goal_y,right_angle);//回転終了をオドメトリから決める
+	branch_rotate_scan();//回転終了をスキャンから決める
+
+
+    	branch_find_flag = false;
+	after_rotate = true;
+	pre_rotate = vel.angular.z;
+	
+
+	std::cout << "到着した分岐領域の座標 (" << odom_x << "," << odom_y << ")" << std::endl;
+
+
+	std::cout << "回転できた!!ぜんし〜ん" << std::endl;
+}
+*/
 void Branch_area_callback(const sensor_msgs::LaserScan::ConstPtr& Branch_msg){
 	const float angle_min = Branch_msg->angle_min;
 	const float angle_increment = Branch_msg->angle_increment;
@@ -1201,6 +1665,14 @@ void Branch_area_callback(const sensor_msgs::LaserScan::ConstPtr& Branch_msg){
 			return;
 		}
 	}
+
+
+
+	/*
+	if(!isnan(ranges[ranges.size()/2]) && ranges[ranges.size()/2] < branch_obst_limit){
+		return;
+	} 
+	*/
 
 	for(int i=0;i<ranges.size();i++){
 		if(!isnan(ranges[i])){
@@ -1249,6 +1721,9 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 	float y_g;
 	std::vector<float> angles;
 
+
+
+
 	//スキャンデータを極座標から直交座標に直すやつ///
 	for(int i=0;i<ranges.size();i++){
 		rad = angle_min+(angle_increment*i);
@@ -1261,18 +1736,20 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 
 	m_angle = VFH_move_angle(ranges,angle_min,angle_increment,all_nan,angles);
 
-	bumper_queue.callOne(ros::WallDuration(1));
-
 	if(m_angle >= all_nan){
-		vel_recovery();
+		if(after_rotate){
+			vel_after_rotate();
+			after_rotate = false;
+		}
+		else{
+			vel_recovery();
+		}
 	}
-	else if(bumper_hit){
-		vel_recovery();
-	}
-
 	else{
 		need_back = true;
 		need_rotate_calc = true;
+		after_rotate = false;
+
 
 		odom_queue.callOne(ros::WallDuration(1));
 		

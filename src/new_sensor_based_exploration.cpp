@@ -11,18 +11,21 @@
 
 /*パブリッシュ、サブスクライブ関連*/
 ros::CallbackQueue VFH_queue;
-ros::CallbackQueue Branch_queue;
-ros::CallbackQueue odom_queue;
-ros::CallbackQueue scan_branch_queue;
-
 ros::SubscribeOptions VFH_option;
-ros::SubscribeOptions Branch_option;
-ros::SubscribeOptions odom_option;
-ros::SubscribeOptions scan_branch_option;
-
 ros::Subscriber VFH_sub;
+
+
+
+ros::CallbackQueue Branch_queue;
+ros::SubscribeOptions Branch_option;
 ros::Subscriber Branch_sub;
+
+ros::CallbackQueue odom_queue;
+ros::SubscribeOptions odom_option;
 ros::Subscriber odom_sub;
+
+ros::CallbackQueue scan_branch_queue;
+ros::SubscribeOptions scan_branch_option;
 ros::Subscriber scan_branch_sub;
 
 ros::CallbackQueue scan_queue;
@@ -30,11 +33,9 @@ ros::SubscribeOptions scan_option;
 ros::Subscriber scan_sub;
 
 ros::Publisher vel_pub;
-ros::Publisher minus_vel_pub;
 ros::Publisher marker_pub;
 
 geometry_msgs::Twist vel;
-geometry_msgs::Twist minus_vel;
 
 ros::CallbackQueue bumper_queue;
 ros::SubscribeOptions bumper_option;
@@ -77,7 +78,7 @@ float pre_loop_y = 0;
 
 float pre_theta = 0;
 
-const float safe_space = 0.45;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
+const float safe_space = 0.40;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
 const float side_dis = 0.375;//VFH_curveの横方向制限
 const float origin_dis = 0.375;//VFH_curveの横方向制限
 int which_bumper = 0;
@@ -110,7 +111,7 @@ float scan_angle;//この角度の範囲内に空間があれば回転を終了�
 
 const float branch_angle = 0.04;//分岐領域を検出するのに必要な障害物がない空間の角度
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
-const int loop_closing_max = 10;//プログラムを切り替えるために必要なループクロージングの回数
+const int loop_closing_max = 20;//プログラムを切り替えるために必要なループクロージングの回数
 
 /*判別用フラグ*/
 bool AI_wakeup = false;//AIの起動演出をするかどうか
@@ -206,7 +207,7 @@ void display_gravity(float x, float y){
 }
 
 void export_data(float i, float range){
-	std::ofstream ofs("odom.csv",std::ios::app);
+	std::ofstream ofs("odomss.csv",std::ios::app);
 	ofs << i << "," << range << std::endl;
 }
 
@@ -351,15 +352,6 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 	
 
 	for(i=0;i<ranges.size();i++){
-		//export_data(angle_min+(angle_increment*i),ranges[i]);
-		if(isnan(ranges[i])){
-			if(isnan(ranges[i+1])){
-				ranges[i] = 0;
-			}
-			else{
-				ranges[i] = ranges[i+1];
-			}
-		}
 		if(ranges[i] >= scan_threshold){
 			ranges[i] = scan_threshold;		
 		}
@@ -665,6 +657,8 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 
 	odom_log_x.push_back(odom_x);
 	odom_log_y.push_back(odom_y);
+	
+	odom_marking(odom_x,odom_y);
 
 }
 
@@ -816,15 +810,6 @@ float VFH_move_angle_g(std::vector<float> &ranges, float angle_min, float angle_
 	
 
 	for(i=0;i<ranges.size();i++){
-		//export_data(angle_min+(angle_increment*i),ranges[i]);
-		if(isnan(ranges[i])){
-			if(isnan(ranges[i+1])){
-				ranges[i] = 0;
-			}
-			else{
-				ranges[i] = ranges[i+1];
-			}
-		}
 		if(ranges[i] >= scan_threshold){
 			ranges[i] = scan_threshold;		
 		}
@@ -1123,6 +1108,10 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 	bumper_queue.callOne(ros::WallDuration(1));
 
 	if(goal_angle_v >= all_nan){
+		/*for(int i=0;i<ranges.size();i++){
+			export_data(angle_min+(angle_increment*i),ranges[i]);
+		}*/	
+
 		vel_recovery_g();
 	}
 	else if(bumper_hit){
@@ -1160,7 +1149,6 @@ void VFH4vel_publish_Branch(){
 	std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
 	
 	while(!finish_flag && ros::ok()){
-		odom_marking(odom_x,odom_y);
 		std::cout << "1" << std::endl;
 		scan_queue.callOne(ros::WallDuration(1));//重力の影響を受けた進行方向を決めて速度を送る
 		std::cout << "2" << std::endl;
@@ -1292,9 +1280,7 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 		display_goal_angle(x_g, y_g);	
 
 
-		vel_curve_VFH(m_angle,-angle_min);
-		odom_queue.callOne(ros::WallDuration(1));
-		odom_marking(odom_x,odom_y);	
+		vel_curve_VFH(m_angle,-angle_min);	
 	}
 }
 

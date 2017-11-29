@@ -78,7 +78,7 @@ float pre_loop_y = 0;
 
 float pre_theta = 0;
 
-const float safe_space = 0.40;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
+const float safe_space = 0.45;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
 const float side_dis = 0.375;//VFH_curveの横方向制限
 const float origin_dis = 0.375;//VFH_curveの横方向制限
 int which_bumper = 0;
@@ -90,8 +90,8 @@ const float PI = 3.1415926;//円周率π
 const float forward_vel = 0.2;//前進速度[m/s]
 const float rotate_vel = 0.5;//回転速度[rad\s]
 //VFH関連のパラメータ///
-const float scan_threshold = 0.5;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
-const float forward_dis = 0.5;//一回のVFHで前方向に進む距離[m]
+const float scan_threshold = 0.6;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
+const float forward_dis = 0.6;//一回のVFHで前方向に進む距離[m]
 const int div_num = 2;//VFHでカーブを行うときに目的地までの距離を分割する数(偶数)
 const float back_vel = -0.2;//VFHで全部nanだったときの後退速度[m/s]
 const float back_time = 0.5;//VFHで全部nanだったときに後退する時間[s]
@@ -119,6 +119,8 @@ bool branch_find_flag = false;//分岐領域があるかどうか
 bool need_back = true;//全部nanだったときに最初だけバックする
 bool need_rotate_calc = true;//全部nanだったときの回転方向を計算する必要があるか
 bool scan_rotation_ok = false;//スキャンデータからの分岐回転を終了していいか
+
+bool retry_chance = true;
 
 void odom_marking(float x, float y){
 	geometry_msgs::Point marking;
@@ -590,7 +592,7 @@ void vel_recovery(){
 			vel.angular.z = rotate_vel;
 		}	
 	
-		ros::Duration duration2(back_time+3.0);
+		ros::Duration duration2(back_time+1.0);
 		set_time = ros::Time::now();
 		while(ros::Time::now()-set_time < duration2){
 			vel_pub.publish(vel);
@@ -627,7 +629,7 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	float rho;
 	float theta_rho;
 	float omega;
-	float t = 0.5;
+	float t = 0.6;
 
 	pre_theta = theta;
 
@@ -1107,11 +1109,15 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 
 	bumper_queue.callOne(ros::WallDuration(1));
 
-	if(goal_angle_v >= all_nan){
-		/*for(int i=0;i<ranges.size();i++){
-			export_data(angle_min+(angle_increment*i),ranges[i]);
-		}*/	
+	if(goal_angle_v >= all_nan && retry_chance){
+		std::cout << "もう一回センサデータ見てみるよ" << std::endl;
+		retry_chance =false;
+		scan_queue.callOne(ros::WallDuration(1));
+		retry_chance =true;
+		return;
+	}
 
+	if(goal_angle_v >= all_nan){
 		vel_recovery_g();
 	}
 	else if(bumper_hit){
@@ -1132,9 +1138,10 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 
 
 void VFH4vel_publish_Branch(){
-	const float goal_margin = 0.3;
+	const float goal_margin = 0.5;
 	bool finish_flag = false;
 	float now2goal_dis;
+	
 
 
 	odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得	
@@ -1149,9 +1156,7 @@ void VFH4vel_publish_Branch(){
 	std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
 	
 	while(!finish_flag && ros::ok()){
-		std::cout << "1" << std::endl;
 		scan_queue.callOne(ros::WallDuration(1));//重力の影響を受けた進行方向を決めて速度を送る
-		std::cout << "2" << std::endl;
 		odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得
 		std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
 		std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
@@ -1250,6 +1255,15 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 	m_angle = VFH_move_angle(ranges,angle_min,angle_increment,all_nan,angles);
 
 	bumper_queue.callOne(ros::WallDuration(1));
+
+	if(m_angle >= all_nan && retry_chance){
+		std::cout << "もう一回センサデータ見てみるよ" << std::endl;
+		retry_chance =false;
+		VFH_queue.callOne(ros::WallDuration(1));
+		retry_chance =true;
+		return;
+	}
+
 
 	if(m_angle >= all_nan){
 		vel_recovery();

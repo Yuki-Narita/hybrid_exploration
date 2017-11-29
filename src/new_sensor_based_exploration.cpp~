@@ -90,8 +90,8 @@ const float PI = 3.1415926;//円周率π
 const float forward_vel = 0.2;//前進速度[m/s]
 const float rotate_vel = 0.5;//回転速度[rad\s]
 //VFH関連のパラメータ///
-const float scan_threshold = 0.6;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
-const float forward_dis = 0.6;//一回のVFHで前方向に進む距離[m]
+const float scan_threshold = 1.0;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
+const float forward_dis = 1.0;//一回のVFHで前方向に進む距離[m]
 const int div_num = 2;//VFHでカーブを行うときに目的地までの距離を分割する数(偶数)
 const float back_vel = -0.2;//VFHで全部nanだったときの後退速度[m/s]
 const float back_time = 0.5;//VFHで全部nanだったときに後退する時間[s]
@@ -121,6 +121,7 @@ bool need_rotate_calc = true;//全部nanだったときの回転方向を計算�
 bool scan_rotation_ok = false;//スキャンデータからの分岐回転を終了していいか
 
 bool retry_chance = true;
+bool retry_chance2 = true;
 
 void odom_marking(float x, float y){
 	geometry_msgs::Point marking;
@@ -612,6 +613,59 @@ void vel_recovery(){
 }
 
 
+void vel_curve_VFH_g(float rad_min ,float angle_max){
+	const float theta = rad_min;
+	const float v = forward_vel;
+	
+	float y = origin_dis*pow(cos(rad_min),2);
+	bool d = true;	
+	/*
+	if(std::abs(rad_min) > (angle_max/2)){
+		y = side_dis * cos(rad_min) / std::abs(sin(rad_min));
+		std::cout << "y_side: " << y << std::endl;
+		d = false;
+	}
+	*/
+	float y_div = y/div_num;
+	float rho;
+	float theta_rho;
+	float omega;
+	float t = 0.75;
+
+	pre_theta = theta;
+
+	theta_rho = 2*theta;
+	rho = y_div/sin(theta_rho);
+	//omega = v/rho;
+	omega = theta_rho/t;
+	//t = theta_rho/omega;
+
+	vel.linear.x = v;
+	vel.angular.z = omega;
+
+	std::cout << theta << "(theta_debag)" << std::endl;
+	std::cout << t << "(t_debag)" << std::endl;
+	std::cout << vel.linear.x << "(v_debag)" << std::endl;
+	std::cout << vel.angular.z << "(o_debag)" << std::endl;
+
+	for(int i=0;i<(div_num/2);i++){
+		for(int k=0;k<1;k++){
+			vel_pub.publish(vel);
+		}
+		std::cout << "障害物を回避しながら移動中♪" << std::endl;
+	}
+
+	odom_queue.callOne(ros::WallDuration(1));
+	
+
+	odom_log_x.push_back(odom_x);
+	odom_log_y.push_back(odom_y);
+	
+	odom_marking(odom_x,odom_y);
+
+}
+
+
 void vel_curve_VFH(float rad_min ,float angle_max){
 	const float theta = rad_min;
 	const float v = forward_vel;
@@ -629,7 +683,7 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	float rho;
 	float theta_rho;
 	float omega;
-	float t = 0.6;
+	float t = 0.1;
 
 	pre_theta = theta;
 
@@ -739,7 +793,7 @@ void approx(std::vector<float> &scan){
 	//左端がnanのとき
 				if(isnan(depth1)){
 					for(int k=0;k<count+1;k++)
-						scan[j-k]=depth2;//0.01;//depth2;
+						scan[j-k]=0.01;//depth2;
 				}
 				else{
 					for(int k=0;k<count;k++)
@@ -752,7 +806,7 @@ void approx(std::vector<float> &scan){
 	//右端がnanのとき
 		if(j==(scan.size()-1)-1 &&isnan(scan[j+1])){
 			for(int k=0;k<count;k++)
-				scan[j+1-k]=depth1;//0.01;//depth1;
+				scan[j+1-k]=0.01;//depth1;
 			//ROS_INFO("val|nan|nan|:nancount=%d",count);
 			count=0;
 		}
@@ -918,6 +972,8 @@ float VFH_move_angle_g(std::vector<float> &ranges, float angle_min, float angle_
 	
 	//plusとminusでnear_iから近い方を選択してrad_minに入れる
 
+	int s_counter = 0;
+
 	if(plus_rad_i != angles.size() || minus_rad_i != angles.size()){
 		pd = std::abs(angles[near_i] - angles[plus_rad_i]);
 		md = std::abs(angles[near_i] - angles[minus_rad_i]);
@@ -932,6 +988,14 @@ float VFH_move_angle_g(std::vector<float> &ranges, float angle_min, float angle_
 
 		if(pd<=md){
 			rad_min = angles[plus_rad_i];
+			//for文で斥力っぽいのをいれたい
+			for(int l=plus_rad_i;l<=0;l--){
+				if(ranges[i] != scan_threshold{
+					s_counter = l;
+				}		
+			}
+
+
 		}
 		else{
 			rad_min = angles[minus_rad_i];
@@ -1098,7 +1162,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 	//スキャンデータを極座標から直交座標に直すやつ///
 	for(int i=0;i<ranges.size();i++){
 		rad = angle_min+(angle_increment*i);
-		ranges[i] = ranges[i] * cos(rad);
+		//ranges[i] = ranges[i] * cos(rad);
 		angles.push_back(rad);
 	}
 	/////////////////////
@@ -1110,12 +1174,21 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 	bumper_queue.callOne(ros::WallDuration(1));
 
 	if(goal_angle_v >= all_nan && retry_chance){
-		std::cout << "もう一回センサデータ見てみるよ" << std::endl;
+		std::cout << "センサデータ見なおし一回目" << std::endl;
 		retry_chance =false;
 		scan_queue.callOne(ros::WallDuration(1));
-		retry_chance =true;
 		return;
 	}
+
+	if(goal_angle_v >= all_nan && retry_chance){
+		std::cout << "センサデータ見なおし二回目" << std::endl;
+		retry_chance2 =false;
+		scan_queue.callOne(ros::WallDuration(1));
+		return;
+	}
+
+	retry_chance =true;
+	retry_chance2 =true;
 
 	if(goal_angle_v >= all_nan){
 		vel_recovery_g();
@@ -1127,7 +1200,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 	else{
 		need_back = true;
 		need_rotate_calc = true;
-		vel_curve_VFH(goal_angle_v, angle_max);	
+		vel_curve_VFH_g(goal_angle_v, angle_max);	
 	}
 
 
@@ -1245,7 +1318,7 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 	//スキャンデータを極座標から直交座標に直すやつ///
 	for(int i=0;i<ranges.size();i++){
 		rad = angle_min+(angle_increment*i);
-		ranges[i] = ranges[i] * cos(rad);
+		//ranges[i] = ranges[i] * cos(rad);
 		angles.push_back(rad);
 	}
 	/////////////////////
@@ -1257,13 +1330,21 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 	bumper_queue.callOne(ros::WallDuration(1));
 
 	if(m_angle >= all_nan && retry_chance){
-		std::cout << "もう一回センサデータ見てみるよ" << std::endl;
+		std::cout << "センサデータ見なおし一回目" << std::endl;
 		retry_chance =false;
 		VFH_queue.callOne(ros::WallDuration(1));
-		retry_chance =true;
 		return;
 	}
 
+	if(m_angle >= all_nan && retry_chance2){
+		std::cout << "センサデータ見なおし二回目" << std::endl;
+		retry_chance2 =false;
+		VFH_queue.callOne(ros::WallDuration(1));
+		return;
+	}
+
+	retry_chance =true;
+	retry_chance2 =true;
 
 	if(m_angle >= all_nan){
 		vel_recovery();

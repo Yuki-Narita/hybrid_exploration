@@ -39,8 +39,7 @@ ros::Subscriber wall_sub;
 
 geometry_msgs::Twist vel;
 
-uint32_t list = visualization_msgs::Marker::LINE_LIST;
-visualization_msgs::Marker marker3;
+
 
 float odom_x;//オドメトリx
 float odom_y;//オドメトリy
@@ -74,9 +73,9 @@ const float PI = 3.1415926;//円周率π
 const float forward_vel = 0.2;//前進速度[m/s]
 const float rotate_vel = 0.5;//回転速度[rad\s]
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
-const float forward_dis = 0.5;//一回のVFHで前方向に進む距離[m]
+const float forward_dis = 1.0;//一回のVFHで前方向に進む距離[m]
 const int div_num = 2;//VFHでカーブを行うときに目的地までの距離を分割する数(偶数)
-const float scan_threshold = 0.5;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
+const float scan_threshold = 1.0;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
 const float safe_space = 0.45;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
 const float side_dis = 0.375;//VFH_curveの横方向制限
 const float origin_dis = 0.375;//VFH_curveの横方向制限
@@ -85,7 +84,7 @@ bool move_success = false;
 
 bool bumper_hit = false;
 int which_bumper = 0;
-
+geometry_msgs::Point marking;
 
 
 //引力を考慮した回転方向が決まったらこの関数を使う//地図情報に基づいて回転方向を決定//引力方向に回ると反転しそうだったら//両側にあったら引力
@@ -183,7 +182,22 @@ void rotation_based_map(const nav_msgs::OccupancyGrid::ConstPtr& map_msg){
 }
 
 void odom_marking(float x, float y){
-	geometry_msgs::Point marking;
+	uint32_t list = visualization_msgs::Marker::LINE_LIST;
+	visualization_msgs::Marker marker3;
+	marker3.header.frame_id = "map";
+	marker3.header.stamp = ros::Time::now();
+	marker3.ns = "basic_shapes";
+	marker3.id = 2;
+	marker3.type = list;
+	marker3.action = visualization_msgs::Marker::ADD;
+	marker3.lifetime = ros::Duration(0);
+	marker3.pose.orientation.w = 1.0;
+	marker3.scale.x = 0.1;
+	marker3.color.b = 1.0f;
+	marker3.color.a = 1.0;
+	marker3.color.r = 0.0f;
+	marker3.color.g = 0.0f;
+
 	marking.x = x;
 	marking.y = y;
 	marking.z = 0.0;
@@ -423,14 +437,15 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	float rho;
 	float theta_rho;
 	float omega;
-	float t;
+	float t = 0.6;
 
 	pre_theta = theta;
 
 	theta_rho = 2*theta;
 	rho = y_div/sin(theta_rho);
 	omega = v/rho;
-	t = theta_rho/omega;
+	omega = theta_rho/t;
+	//t = theta_rho/omega;
 
 	vel.linear.x = v;
 	vel.angular.z = omega;
@@ -479,8 +494,9 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 	float x_g;
 	float y_g;
 	float ang_g;
+	int l;
 	
-
+/*
 	for(i=0;i<ranges.size();i++){
 		//export_data(angle_min+(angle_increment*i),ranges[i]);
 		if(isnan(ranges[i])){
@@ -495,7 +511,7 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 			ranges[i] = scan_threshold;		
 		}
 	}
-
+*/
 //gra_angleを中心にして±に角度を見ていって先にロボットの直径分の空間が見つかったらその時点でその中心を目標にする
 //gra_angleをロボットの座標軸で表すgra_angle_r
 	
@@ -527,17 +543,18 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 	//先にプラス側を見る
 	for(i=near_i;i<angles.size();i++){
 		//std::cout << "plusのfor" << std::endl;
-		if(ranges[i] == scan_threshold){
+		if(ranges[i] > scan_threshold){
 			start_i = i;
+			l = i;
 			rad_counter = 0;
-			while(ranges[i] == scan_threshold && rad_counter < safe_num && i < angles.size()-1){//iの限界
+			while(ranges[l] > scan_threshold && rad_counter < safe_num && l < angles.size()-1){//iの限界
 				rad_counter++;
-				i++;
+				l++;
 			}
 			if(rad_counter == safe_num && start_i >= safe_num){//プラス側はOKなのでマイナス側を見に行く
 				rad_counter = 0;
 				for(j=start_i;j>start_i-safe_num;j--){
-					if(ranges[i] == scan_threshold && rad_counter < safe_num){
+					if(ranges[j] > scan_threshold && rad_counter < safe_num){
 						rad_counter++;
 					}
 					//std::cout << "j:" << j << std::endl;
@@ -548,29 +565,30 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 					break;
 				}	
 			}
-		}
+		}/*
 		else{
 			i++;
-		}
+		}*/
 	}
 	//std::cout << "plusのfor抜けた" << std::endl;
 
 
 
 
-	for(i=near_i;i>0;i--){
+	for(i=near_i;i>=0;i--){
 		//std::cout << "minusのfor" << std::endl;
-		if(ranges[i] == scan_threshold){
+		if(ranges[i] > scan_threshold){
 			start_i = i;
+			l = i;
 			rad_counter = 0;
-			while(ranges[i] == scan_threshold && rad_counter < safe_num && i > 1){
+			while(ranges[l] > scan_threshold && rad_counter < safe_num && l > 1){
 				rad_counter++;
-				i--;
+				l--;
 			}
 			if(rad_counter == safe_num && start_i <= angles.size()-safe_num){//マイナス側はOKなのでプラス側を見に行く//ここやってない//やった
 				rad_counter = 0;
 				for(j=start_i;j<start_i+safe_num;j++){
-					if(ranges[i] == scan_threshold && rad_counter < safe_num){
+					if(ranges[j] > scan_threshold && rad_counter < safe_num){
 						rad_counter++;
 					}
 				}
@@ -676,7 +694,7 @@ void approx(std::vector<float> &scan){
 	//左端がnanのとき
 				if(isnan(depth1)){
 					for(int k=0;k<count+1;k++)
-						scan[j-k]=depth2;//0.01;//depth2;
+						scan[j-k]=0.01;//depth2;
 				}
 				else{
 					for(int k=0;k<count;k++)
@@ -689,7 +707,7 @@ void approx(std::vector<float> &scan){
 	//右端がnanのとき
 		if(j==(scan.size()-1)-1 &&isnan(scan[j+1])){
 			for(int k=0;k<count;k++)
-				scan[j+1-k]=depth1;//0.01;//depth1;
+				scan[j+1-k]=0.01;//depth1;
 			//ROS_INFO("val|nan|nan|:nancount=%d",count);
 			count=0;
 		}
@@ -728,7 +746,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 	//スキャンデータを極座標から直交座標に直すやつ///
 	for(int i=0;i<ranges.size();i++){
 		rad = angle_min+(angle_increment*i);
-		ranges[i] = ranges[i] * cos(rad);
+		//ranges[i] = ranges[i] * cos(rad);
 		angles.push_back(rad);
 	}
 	/////////////////////
@@ -765,9 +783,9 @@ void VFH_navigation(float goal_x, float goal_y){
 	bool finish_flag = false;
 	float now2goal_dis;
 
-	goal_point_x = 1.7;
+	/*goal_point_x = 1.7;
 	goal_point_y = -0.7;
-
+*/
 
 	std::cout << "目標へ移動開始" << std::endl;
 	std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
@@ -1290,19 +1308,6 @@ int main(int argc, char** argv){
 	scan_branch_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,scan_branch_callback,ros::VoidPtr(),&scan_branch_queue);	
 	scan_branch_sub = f.subscribe(scan_branch_option);
 
-	marker3.header.frame_id = "map";
-	marker3.header.stamp = ros::Time::now();
-	marker3.ns = "basic_shapes";
-	marker3.id = 2;
-	marker3.type = list;
-	marker3.action = visualization_msgs::Marker::ADD;
-	marker3.lifetime = ros::Duration(0);
-	marker3.pose.orientation.w = 1.0;
-	marker3.scale.x = 0.1;
-	marker3.color.b = 1.0f;
-	marker3.color.a = 1.0;
-	marker3.color.r = 0.0f;
-	marker3.color.g = 0.0f;
 
 
 	std::cout << "start:探査プログラム" << std::endl;

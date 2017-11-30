@@ -50,9 +50,6 @@ ros::SubscribeOptions re_scan_option;
 ros::Subscriber re_scan_sub;
 
 
-uint32_t list = visualization_msgs::Marker::LINE_LIST;
-visualization_msgs::Marker marker3;
-
 /*グローバルで使う変数*/
 ros::Time set_time;//時間制限系while文の開始時間
 float goal_x;//分岐領域までの距離X(ロボットの前方向)
@@ -129,8 +126,25 @@ bool scan_rotation_ok = false;//スキャンデータからの分岐回転を終
 bool retry_chance = true;
 bool retry_chance2 = true;
 
+geometry_msgs::Point marking;
+
 void odom_marking(float x, float y){
-	geometry_msgs::Point marking;
+	uint32_t list = visualization_msgs::Marker::LINE_LIST;
+	visualization_msgs::Marker marker3;
+	marker3.header.frame_id = "map";
+	marker3.header.stamp = ros::Time::now();
+	marker3.ns = "basic_shapes";
+	marker3.id = 2;
+	marker3.type = list;
+	marker3.action = visualization_msgs::Marker::ADD;
+	marker3.lifetime = ros::Duration(0);
+	marker3.pose.orientation.w = 1.0;
+	marker3.scale.x = 0.1;
+	marker3.color.b = 0.0f;
+	marker3.color.a = 1.0;
+	marker3.color.r = 1.0f;
+	marker3.color.g = 1.0f;
+
 	marking.x = x;
 	marking.y = y;
 	marking.z = 0.0;
@@ -1266,12 +1280,12 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 
 void VFH4vel_publish_Branch(){
 	const float goal_margin = 0.5;
-	const float gra_enable = 2.0;
+	const float gra_enable = std::abs(goal_y)*1.3;
 	const float gra_force = 6.0;
 	float now2goal_dis =100;
 	float pre_now2goal_dis;
 	float sum_diff = 0;
-	const float cancel_diff = -0.3; 
+	const float cancel_diff = 0; 
 	
 
 	odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得	
@@ -1506,19 +1520,6 @@ int main(int argc, char** argv){
 	vel.angular.x = 0;
 	vel.angular.y = 0;
 
-	marker3.header.frame_id = "map";
-	marker3.header.stamp = ros::Time::now();
-	marker3.ns = "basic_shapes";
-	marker3.id = 2;
-	marker3.type = list;
-	marker3.action = visualization_msgs::Marker::ADD;
-	marker3.lifetime = ros::Duration(0);
-	marker3.pose.orientation.w = 1.0;
-	marker3.scale.x = 0.1;
-	marker3.color.b = 0.0f;
-	marker3.color.a = 1.0;
-	marker3.color.r = 1.0f;
-	marker3.color.g = 1.0f;
 
 
 	if(AI_wakeup){

@@ -45,6 +45,10 @@ ros::CallbackQueue tf_queue;
 ros::SubscribeOptions tf_option;
 ros::Subscriber tf_sub;
 
+ros::CallbackQueue re_scan_queue;
+ros::SubscribeOptions re_scan_option;
+ros::Subscriber re_scan_sub;
+
 
 uint32_t list = visualization_msgs::Marker::LINE_LIST;
 visualization_msgs::Marker marker3;
@@ -53,6 +57,8 @@ visualization_msgs::Marker marker3;
 ros::Time set_time;//時間制限系while文の開始時間
 float goal_x;//分岐領域までの距離X(ロボットの前方向)
 float goal_y;//分岐領域までの距離X(ロボットの横方向)
+
+float goal_angle_v;
 
 float goal_point_x;
 float goal_point_y;
@@ -352,14 +358,15 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 	float x_g;
 	float y_g;
 	float ang_g;
+	int l;
 	
-
+/*
 	for(i=0;i<ranges.size();i++){
 		if(ranges[i] >= scan_threshold){
 			ranges[i] = scan_threshold;		
 		}
 	}
-
+*/
 //gra_angleを中心にして±に角度を見ていって先にロボットの直径分の空間が見つかったらその時点でその中心を目標にする
 //gra_angleをロボットの座標軸で表すgra_angle_r
 	/*
@@ -402,17 +409,18 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 	//先にプラス側を見る
 	for(i=near_i;i<angles.size();i++){
 		//std::cout << "plusのfor" << std::endl;
-		if(ranges[i] == scan_threshold){
+		if(ranges[i] > scan_threshold){
 			start_i = i;
+			l = i;
 			rad_counter = 0;
-			while(ranges[i] == scan_threshold && rad_counter < safe_num && i < angles.size()-1){//iの限界
+			while(ranges[l] > scan_threshold && rad_counter < safe_num && l < angles.size()-1){//iの限界
 				rad_counter++;
-				i++;
+				l++;
 			}
 			if(rad_counter == safe_num && start_i >= safe_num){//プラス側はOKなのでマイナス側を見に行く
 				rad_counter = 0;
 				for(j=start_i;j>start_i-safe_num;j--){
-					if(ranges[i] == scan_threshold && rad_counter < safe_num){
+					if(ranges[j] > scan_threshold && rad_counter < safe_num){
 						rad_counter++;
 					}
 					//std::cout << "j:" << j << std::endl;
@@ -423,10 +431,10 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 					break;
 				}	
 			}
-		}
+		}/*
 		else{
 			i++;
-		}
+		}*/
 	}
 	//std::cout << "plusのfor抜けた" << std::endl;
 
@@ -435,17 +443,18 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 
 	for(i=near_i;i>0;i--){
 		//std::cout << "minusのfor" << std::endl;
-		if(ranges[i] == scan_threshold){
+		if(ranges[i] > scan_threshold){
 			start_i = i;
+			l = i;
 			rad_counter = 0;
-			while(ranges[i] == scan_threshold && rad_counter < safe_num && i > 1){
+			while(ranges[l] > scan_threshold && rad_counter < safe_num && l > 1){
 				rad_counter++;
-				i--;
+				l--;
 			}
 			if(rad_counter == safe_num && start_i <= angles.size()-safe_num){//マイナス側はOKなのでプラス側を見に行く//ここやってない//やった
 				rad_counter = 0;
 				for(j=start_i;j<start_i+safe_num;j++){
-					if(ranges[i] == scan_threshold && rad_counter < safe_num){
+					if(ranges[j] > scan_threshold && rad_counter < safe_num){
 						rad_counter++;
 					}
 				}
@@ -455,10 +464,10 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 					break;
 				}	
 			}
-		}
+		}/*
 		else{
 			i--;
-		}
+		}*/
 	}
 	//std::cout << "minusのfor抜けた" << std::endl;
 
@@ -630,7 +639,7 @@ void vel_curve_VFH_g(float rad_min ,float angle_max){
 	float rho;
 	float theta_rho;
 	float omega;
-	float t = 0.75;
+	float t = 0.6;
 
 	pre_theta = theta;
 
@@ -683,7 +692,7 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	float rho;
 	float theta_rho;
 	float omega;
-	float t = 0.1;
+	float t = 0.15;
 
 	pre_theta = theta;
 
@@ -863,14 +872,16 @@ float VFH_move_angle_g(std::vector<float> &ranges, float angle_min, float angle_
 	float x_g;
 	float y_g;
 	float ang_g;
+	int l;
 	
-
+/*
 	for(i=0;i<ranges.size();i++){
+		export_data(angle_min+(angle_increment*i),ranges[i]);
 		if(ranges[i] >= scan_threshold){
 			ranges[i] = scan_threshold;		
 		}
 	}
-
+*/
 //gra_angleを中心にして±に角度を見ていって先にロボットの直径分の空間が見つかったらその時点でその中心を目標にする
 //gra_angleをロボットの座標軸で表すgra_angle_r
 	
@@ -901,70 +912,78 @@ float VFH_move_angle_g(std::vector<float> &ranges, float angle_min, float angle_
 //gra_angle_rに一番近いiから±に安全角度を見つける,プラス側に行って半径分領域があったらそのマイナス側に半径分の領域があるかを見る
 	//先にプラス側を見る
 	for(i=near_i;i<angles.size();i++){
-		//std::cout << "plusのfor" << std::endl;
-		if(ranges[i] == scan_threshold){
-			//std::cout << "fp_ranges[i]:" << ranges[i] << std::endl;
+		//std::cout << "plusのfor,i:" << i << ",ranges[i]:" << ranges[i] << std::endl;
+		if(ranges[i] > scan_threshold){
+			//std::cout << "正方向" << std::endl;
 			start_i = i;
+			l = i;
 			rad_counter = 0;
-			while(ranges[i] == scan_threshold && rad_counter < safe_num && i < angles.size()-1){//iの限界
-					//std::cout << "sp_ranges[i]:" << ranges[i] << std::endl;
+			while(ranges[l] > scan_threshold && rad_counter < safe_num && l < angles.size()-1){//iの限界
+				//std::cout << "sp_ranges[i]:" << ranges[i] << std::endl;
 				rad_counter++;
-				i++;
+				l++;
 			}
+			//std::cout << "rad_counter1:" << rad_counter << std::endl;
 			if(rad_counter == safe_num && start_i >= safe_num){//プラス側はOKなのでマイナス側を見に行く
+				//std::cout << "逆方向" << std::endl;
 				rad_counter = 0;
 				for(j=start_i;j>start_i-safe_num;j--){
-					if(ranges[i] == scan_threshold && rad_counter < safe_num){
+					if(ranges[j] > scan_threshold && rad_counter < safe_num){
 						//std::cout << "tp_ranges[i]:" << ranges[i] << std::endl;
 						rad_counter++;
 					}
 					//std::cout << "j:" << j << std::endl;
 				}
+				//std::cout << "rad_counter2:" << rad_counter << std::endl;
 				if(rad_counter == safe_num){
 					plus_rad_i = start_i;
 					//std::cout << "breakした" << std::endl;
 					break;
 				}	
 			}
-		}
+		}/*
 		else{
 			i++;
-		}
+		}*/
 	}
 	//std::cout << "plusのfor抜けた" << std::endl;
 
 
 
 
-	for(i=near_i;i>0;i--){
-		//std::cout << "minusのfor" << std::endl;
-		if(ranges[i] == scan_threshold){
-			//std::cout << "fm_ranges[i]:" << ranges[i] << std::endl;
+	for(i=near_i;i>=0;i--){
+		//std::cout << "minusのfor,i:" << i << ",ranges[i]:" << ranges[i] << std::endl;
+		if(ranges[i] > scan_threshold){
+			//std::cout << "正方向" << std::endl;
 			start_i = i;
+			l = i;
 			rad_counter = 0;
-			while(ranges[i] == scan_threshold && rad_counter < safe_num && i > 1){
-				//std::cout << "sm_ranges[i]:" << ranges[i] << std::endl;
+			while(ranges[l] > scan_threshold && rad_counter < safe_num && l > 0){
+				//std::cout << "sm_ranges[i]:" << ranges[l] << std::endl;
 				rad_counter++;
-				i--;
+				l--;
 			}
+			//std::cout << "rad_counter1:" << rad_counter << std::endl;
 			if(rad_counter == safe_num && start_i <= angles.size()-safe_num){//マイナス側はOKなのでプラス側を見に行く//ここやってない//やった
+				//std::cout << "逆方向" << std::endl;
 				rad_counter = 0;
 				for(j=start_i;j<start_i+safe_num;j++){
-					if(ranges[i] == scan_threshold && rad_counter < safe_num){
+					if(ranges[j] > scan_threshold && rad_counter < safe_num){
 						//std::cout << "tm_ranges[i]:" << ranges[i] << std::endl;
 						rad_counter++;
 					}
 				}
+				//std::cout << "rad_counter2:" << rad_counter << std::endl;
 				if(rad_counter == safe_num){
 					minus_rad_i = start_i;
 					//std::cout << "breakした" << std::endl;
 					break;
 				}	
 			}
-		}
+		}/*
 		else{
 			i--;
-		}
+		}*/
 	}
 	//std::cout << "minusのfor抜けた" << std::endl;
 
@@ -972,7 +991,7 @@ float VFH_move_angle_g(std::vector<float> &ranges, float angle_min, float angle_
 	
 	//plusとminusでnear_iから近い方を選択してrad_minに入れる
 
-	int s_counter = 0;
+	float repulsion_factor = 1.0;
 
 	if(plus_rad_i != angles.size() || minus_rad_i != angles.size()){
 		pd = std::abs(angles[near_i] - angles[plus_rad_i]);
@@ -988,20 +1007,40 @@ float VFH_move_angle_g(std::vector<float> &ranges, float angle_min, float angle_
 
 		if(pd<=md){
 			rad_min = angles[plus_rad_i];
-			//for文で斥力っぽいのをいれたい
-			for(int l=plus_rad_i;l<=0;l--){
-				if(ranges[i] != scan_threshold{
-					s_counter = l;
-				}		
-			}
-
-
 		}
 		else{
 			rad_min = angles[minus_rad_i];
 		}
 
+	
+		//for文で斥力っぽいのをいれたい
+/*
+		if(rad_min > 0){
+			for(int s=0;s<angles.size();s++){
+				if(!isnan(ranges[s]) && ranges[s] > 0.1){
+					repulsion_factor = -(scan_threshold*1)+std::abs(ranges[s]*sin(angles[s]));
+					std::cout << "plus, y:" <<  std::abs(ranges[s]*sin(angles[s])) << ",range:" << ranges[s] << ",angle" << angles[s] << ",factor:" << repulsion_factor << std::endl;
+					break;
+				}	
+			}
+			if(repulsion_factor < 0){
+				rad_min = (1+repulsion_factor)*rad_min;
+			}
+		}
+		else{
+			for(int s=angles.size()-1;s>=0;s--){
+				if(!isnan(ranges[s]) && ranges[s] > 0.1){
+					repulsion_factor = -(scan_threshold*1)+std::abs(ranges[s]*sin(angles[s]));
+					std::cout << "minus, y:" <<  std::abs(ranges[s]*sin(angles[s])) << std::endl;
+					break;
+				}	
+			}
+			if(repulsion_factor < 0){
+				rad_min = (1+repulsion_factor)*rad_min;
+			}
+		}
 
+	*/	
 		//目標角度をグローバルで
 		ang_g = yaw + rad_min;
 		if(ang_g > PI){
@@ -1117,7 +1156,7 @@ void vel_recovery_g(){
 			vel.angular.z = rotate_vel;
 		}	
 	
-		ros::Duration duration2(back_time+3.0);
+		ros::Duration duration2(back_time+1.0);
 		set_time = ros::Time::now();
 		while(ros::Time::now()-set_time < duration2){
 			vel_pub.publish(vel);
@@ -1139,10 +1178,34 @@ void vel_recovery_g(){
 }
 
 
+void scan_retry(const sensor_msgs::LaserScan::ConstPtr& re_scan_msg){
+	const float angle_min = re_scan_msg->angle_min;
+	const float angle_max = re_scan_msg->angle_max;
+	const float angle_increment = re_scan_msg->angle_increment;
+	const float all_nan = 3.14;
+
+	std::vector<float> ranges = re_scan_msg->ranges;
+	float rad;
+	std::vector<float> angles;
+
+	//スキャンデータを極座標から直交座標に直すやつ///
+	for(int i=0;i<ranges.size();i++){
+		rad = angle_min+(angle_increment*i);
+		//ranges[i] = ranges[i] * cos(rad);
+		angles.push_back(rad);
+	}
+	/////////////////////
+
+	approx(ranges);
+
+	goal_angle_v = VFH_move_angle_g(ranges,angle_min,angle_increment,all_nan,gra_angle,angles);
+}
+
+
 void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の影響を受けた目標角度を決める
 	vfh_gra_x = goal_point_x - odom_x;
 	vfh_gra_y = goal_point_y - odom_y;
-	float goal_angle_v;
+	//float goal_angle_v;
 
 	display_gravity(goal_point_x, goal_point_y);
 
@@ -1159,6 +1222,8 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 	float rad;
 	std::vector<float> angles;
 
+	int re = 0;
+
 	//スキャンデータを極座標から直交座標に直すやつ///
 	for(int i=0;i<ranges.size();i++){
 		rad = angle_min+(angle_increment*i);
@@ -1172,24 +1237,13 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 	goal_angle_v = VFH_move_angle_g(ranges,angle_min,angle_increment,all_nan,gra_angle,angles);
 
 	bumper_queue.callOne(ros::WallDuration(1));
-
-	if(goal_angle_v >= all_nan && retry_chance){
-		std::cout << "センサデータ見なおし一回目" << std::endl;
-		retry_chance =false;
-		scan_queue.callOne(ros::WallDuration(1));
-		return;
+/*
+	while(goal_angle_v >= all_nan && re < 2){
+		std::cout << "センサデータ見なおし" << re+1 << "回目" << std::endl;
+		re_scan_queue.callOne(ros::WallDuration(1));
+		re++;
 	}
-
-	if(goal_angle_v >= all_nan && retry_chance){
-		std::cout << "センサデータ見なおし二回目" << std::endl;
-		retry_chance2 =false;
-		scan_queue.callOne(ros::WallDuration(1));
-		return;
-	}
-
-	retry_chance =true;
-	retry_chance2 =true;
-
+*/
 	if(goal_angle_v >= all_nan){
 		vel_recovery_g();
 	}
@@ -1212,10 +1266,13 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 
 void VFH4vel_publish_Branch(){
 	const float goal_margin = 0.5;
-	bool finish_flag = false;
-	float now2goal_dis;
+	const float gra_enable = 2.0;
+	const float gra_force = 6.0;
+	float now2goal_dis =100;
+	float pre_now2goal_dis;
+	float sum_diff = 0;
+	const float cancel_diff = -0.3; 
 	
-
 
 	odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得	
 
@@ -1227,15 +1284,46 @@ void VFH4vel_publish_Branch(){
 	std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
 
 	std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
+
+	now2goal_dis = sqrt(pow(goal_point_x-odom_x,2)+pow(goal_point_y-odom_y,2));
+
+	//分岐領域までの距離が一定以下になったら引力発動
+	while(now2goal_dis > gra_enable && now2goal_dis < gra_force && ros::ok()){
+		display_gravity(goal_point_x, goal_point_y);
+		VFH_queue.callOne(ros::WallDuration(1));
+		odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得
+		std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
+		std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
+		pre_now2goal_dis = now2goal_dis;
+		now2goal_dis = sqrt(pow(goal_point_x-odom_x,2)+pow(goal_point_y-odom_y,2));
+		if(pre_now2goal_dis - now2goal_dis < 0){
+			sum_diff += pre_now2goal_dis - now2goal_dis;
+			if(sum_diff < cancel_diff){
+				std::cout << "距離が遠くなったためbreak" << std::endl;
+				break;
+			}
+		}
+		else{
+			sum_diff = 0;
+		}
+	}
 	
-	while(!finish_flag && ros::ok()){
+	while(now2goal_dis > goal_margin && ros::ok()){
 		scan_queue.callOne(ros::WallDuration(1));//重力の影響を受けた進行方向を決めて速度を送る
 		odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得
 		std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
 		std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
+		pre_now2goal_dis = now2goal_dis;
 		now2goal_dis = sqrt(pow(goal_point_x-odom_x,2)+pow(goal_point_y-odom_y,2));
-		if(now2goal_dis < goal_margin){
-			break;
+		if(pre_now2goal_dis - now2goal_dis < 0){
+			sum_diff += pre_now2goal_dis - now2goal_dis;
+			if(sum_diff < cancel_diff){
+				std::cout << "距離が遠くなったためbreak" << std::endl;
+				break;
+			}
+		}
+		else{
+			sum_diff = 0;
 		}
 	}
 	std::cout << "目標へ移動終了" << std::endl;
@@ -1328,7 +1416,7 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 	m_angle = VFH_move_angle(ranges,angle_min,angle_increment,all_nan,angles);
 
 	bumper_queue.callOne(ros::WallDuration(1));
-
+/*
 	if(m_angle >= all_nan && retry_chance){
 		std::cout << "センサデータ見なおし一回目" << std::endl;
 		retry_chance =false;
@@ -1345,7 +1433,7 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 
 	retry_chance =true;
 	retry_chance2 =true;
-
+*/
 	if(m_angle >= all_nan){
 		vel_recovery();
 	}
@@ -1405,6 +1493,9 @@ int main(int argc, char** argv){
 
 	bumper_option = ros::SubscribeOptions::create<kobuki_msgs::BumperEvent>("/bumper_info",1,bumper,ros::VoidPtr(),&bumper_queue);
 	bumper_sub = s.subscribe(bumper_option);
+
+	re_scan_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,scan_retry,ros::VoidPtr(),&re_scan_queue);
+	re_scan_sub = s.subscribe(re_scan_option);
 
 
 	vel_pub = s.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1);

@@ -107,7 +107,7 @@ const float Branch_range_limit = 5.0;//分岐領域の判断を行う距離の�
 const float branch_obst_limit = 1.0;//スキャンデータの中心がこの値以下のとき分岐領域を検出しない[m]
 const float fix_sensor = 0.07;//分岐領域座標設定のときにセンサーから取れる距離の誤差を手前に補正(センサー値からマイナスする)[m]
 //重複探査関連のパラメータ///
-const float duplication_margin = 0.3;//重複探査の判断をするときの半径[m]←正方形の辺の半分の長さでした
+const float duplication_margin = 1.0;//重複探査の判断をするときの半径[m]←正方形の辺の半分の長さでした
 
 
 const float scan_branch_limit = 1.5;//分岐方向への回転をセンサデータから行うときにこの値以上だったら数値があっても良い
@@ -571,10 +571,10 @@ void vel_recovery(){
 
 	if(need_rotate_calc){
 		if(pre_theta >=0){
-			vel.angular.z = -rotate_vel;
+			vel.angular.z = rotate_vel;
 		}
 		else{
-			vel.angular.z = rotate_vel;
+			vel.angular.z = -rotate_vel;
 		}
 		//vel.angular.z = rotation_direction();
 		vel.linear.x = 0;
@@ -692,7 +692,7 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	float rho;
 	float theta_rho;
 	float omega;
-	float t = 0.15;
+	float t = 0.2;
 
 	pre_theta = theta;
 

@@ -37,9 +37,14 @@ ros::CallbackQueue wall_queue;
 ros::SubscribeOptions wall_option;
 ros::Subscriber wall_sub;
 
+ros::CallbackQueue scan_rotate_queue;
+ros::SubscribeOptions scan_rotate_option;
+ros::Subscriber scan_rotate_sub;
+
 geometry_msgs::Twist vel;
 
-
+float Emergency_avoidance = 0;
+bool undecided_rotate = false;
 
 float odom_x;//オドメトリx
 float odom_y;//オドメトリy
@@ -73,9 +78,9 @@ const float PI = 3.1415926;//円周率π
 const float forward_vel = 0.2;//前進速度[m/s]
 const float rotate_vel = 0.5;//回転速度[rad\s]
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
-const float forward_dis = 1.0;//一回のVFHで前方向に進む距離[m]
+const float forward_dis = 0.8;//一回のVFHで前方向に進む距離[m]
 const int div_num = 2;//VFHでカーブを行うときに目的地までの距離を分割する数(偶数)
-const float scan_threshold = 1.0;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
+const float scan_threshold = 0.8;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
 const float safe_space = 0.45;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
 const float side_dis = 0.375;//VFH_curveの横方向制限
 const float origin_dis = 0.375;//VFH_curveの横方向制限
@@ -85,6 +90,8 @@ bool move_success = false;
 bool bumper_hit = false;
 int which_bumper = 0;
 geometry_msgs::Point marking;
+
+
 
 
 //引力を考慮した回転方向が決まったらこの関数を使う//地図情報に基づいて回転方向を決定//引力方向に回ると反転しそうだったら//両側にあったら引力
@@ -182,7 +189,7 @@ void rotation_based_map(const nav_msgs::OccupancyGrid::ConstPtr& map_msg){
 }
 
 void odom_marking(float x, float y){
-	uint32_t list = visualization_msgs::Marker::LINE_LIST;
+	uint32_t list = visualization_msgs::Marker::LINE_STRIP;
 	visualization_msgs::Marker marker3;
 	marker3.header.frame_id = "map";
 	marker3.header.stamp = ros::Time::now();
@@ -421,6 +428,49 @@ void vel_recovery(){
 }
 
 
+void vel_curve_VFH_e(float rad_min ,float angle_max){
+	const float theta = rad_min;
+	const float v = forward_vel;
+	
+	float y = origin_dis*pow(cos(rad_min),2);
+	bool d = true;	
+	
+	if(std::abs(rad_min) > (angle_max/2)){
+		y = side_dis * cos(rad_min) / std::abs(sin(rad_min));
+		std::cout << "y_side: " << y << std::endl;
+		d = false;
+	}
+	float y_div = y/div_num;
+	float rho;
+	float theta_rho;
+	float omega;
+	float t = 0.2;
+
+	pre_theta = theta;
+
+	theta_rho = 2*theta;
+	rho = y_div/sin(theta_rho);
+	omega = v/rho;
+	omega = theta_rho/t;
+	//t = theta_rho/omega;
+
+	vel.linear.x = v;
+	vel.angular.z = omega;
+
+	std::cout << theta << "(theta_debag)" << std::endl;
+	std::cout << t << "(t_debag)" << std::endl;
+	std::cout << vel.linear.x << "(v_debag)" << std::endl;
+	std::cout << vel.angular.z << "(o_debag)" << std::endl;
+
+	for(int i=0;i<(div_num/2);i++){
+		for(int k=0;k<1;k++){
+			vel_pub.publish(vel);
+		}
+		std::cout << "障害物を回避しながら移動中♪" << std::endl;
+	}
+}
+
+
 void vel_curve_VFH(float rad_min ,float angle_max){
 	const float theta = rad_min;
 	const float v = forward_vel;
@@ -437,7 +487,7 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	float rho;
 	float theta_rho;
 	float omega;
-	float t = 0.6;
+	float t = 1.0;
 
 	pre_theta = theta;
 
@@ -721,6 +771,51 @@ void approx(std::vector<float> &scan){
 	}
 }
 
+void scan_rotate_callback(const sensor_msgs::LaserScan::ConstPtr& src_msg){
+	float plus_ave;
+	float minus_ave;
+	float sum = 0;
+
+	std::vector<float> ranges = src_msg->ranges;
+
+	approx(ranges);
+
+	//minus側の平均
+	for(int i=0;i<ranges.size()/2;i++){
+		if(!isnan(ranges[i])){	
+			sum += ranges[i];
+		}
+	}
+	minus_ave = sum/(ranges.size()/2);
+	
+	sum = 0;
+
+	//plus側
+	for(int i=ranges.size()/2;i<ranges.size();i++){
+		if(!isnan(ranges[i])){
+			sum += ranges[i];
+		}
+	}
+	plus_ave = sum/(ranges.size()/2);
+
+	//平均を比較
+
+	std::cout << "plus_ave:" << plus_ave << std::endl;
+	std::cout << "minus_ave:" << minus_ave << std::endl;
+
+	if(plus_ave > minus_ave){
+		std::cout << "plusに回転\n" << std::endl;
+		Emergency_avoidance = 1.0;
+	}
+	else if(plus_ave < minus_ave){
+		std::cout << "minusに回転\n" << std::endl;
+		Emergency_avoidance = -1.0;
+	}
+	else{
+		std::cout << "無理です\n" << std::endl;	
+		undecided_rotate = true;
+	}
+}
 
 
 void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の影響を受けた目標角度を決める
@@ -757,13 +852,20 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 
 	bumper_queue.callOne(ros::WallDuration(1));
 
-	if(goal_angle >= all_nan){
-		vel_recovery();
-	}
-	else if(bumper_hit){
-		vel_recovery();
-	}
 
+	if(bumper_hit){
+		vel_recovery();
+	}
+	else if(goal_angle >= all_nan){
+		scan_rotate_queue.callOne(ros::WallDuration(1));
+		if(undecided_rotate){
+			vel_recovery();
+			undecided_rotate = false;
+		}
+		else{
+			vel_curve_VFH_e(Emergency_avoidance*angle_max/6,angle_max);
+		}
+	}
 	else{
 		need_back = true;
 		need_rotate_calc = true;
@@ -1308,6 +1410,8 @@ int main(int argc, char** argv){
 	scan_branch_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,scan_branch_callback,ros::VoidPtr(),&scan_branch_queue);	
 	scan_branch_sub = f.subscribe(scan_branch_option);
 
+	scan_rotate_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,scan_rotate_callback,ros::VoidPtr(),&scan_rotate_queue);
+	scan_rotate_sub = f.subscribe(scan_rotate_option);
 
 
 	std::cout << "start:探査プログラム" << std::endl;

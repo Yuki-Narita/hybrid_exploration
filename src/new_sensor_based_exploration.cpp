@@ -14,7 +14,9 @@ ros::CallbackQueue VFH_queue;
 ros::SubscribeOptions VFH_option;
 ros::Subscriber VFH_sub;
 
-
+ros::CallbackQueue scan_rotate_queue;
+ros::SubscribeOptions scan_rotate_option;
+ros::Subscriber scan_rotate_sub;
 
 ros::CallbackQueue Branch_queue;
 ros::SubscribeOptions Branch_option;
@@ -34,6 +36,7 @@ ros::Subscriber scan_sub;
 
 ros::Publisher vel_pub;
 ros::Publisher marker_pub;
+//ros::Publisher marker2_pub;
 
 geometry_msgs::Twist vel;
 
@@ -68,10 +71,23 @@ float gra_angle_r;
 
 int center_count = 0;
 
+
+
+float Emergency_avoidance = 0;
+bool undecided_rotate = false;
+
+
+
 float goal_angle;//分岐領域がある角度(表示用)
 float odom_x;//オドメトリx
 float odom_y;//オドメトリy
+
+//geometry_msgs::Point odom;//オドメトリ
+
 double yaw;//ヨー角
+
+//std::vector<geometry_msgs::Point> odom_log;//オドメトリの履歴
+
 std::vector<float> odom_log_x;//オドメトリxの履歴を保存
 std::vector<float> odom_log_y;//オドメトリyの履歴を保存
 
@@ -93,8 +109,8 @@ const float PI = 3.1415926;//円周率π
 const float forward_vel = 0.2;//前進速度[m/s]
 const float rotate_vel = 0.5;//回転速度[rad\s]
 //VFH関連のパラメータ///
-const float scan_threshold = 1.0;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
-const float forward_dis = 1.0;//一回のVFHで前方向に進む距離[m]
+const float scan_threshold = 0.8;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
+const float forward_dis = 0.8;//一回のVFHで前方向に進む距離[m]
 const int div_num = 2;//VFHでカーブを行うときに目的地までの距離を分割する数(偶数)
 const float back_vel = -0.2;//VFHで全部nanだったときの後退速度[m/s]
 const float back_time = 0.5;//VFHで全部nanだったときに後退する時間[s]
@@ -126,11 +142,13 @@ bool scan_rotation_ok = false;//スキャンデータからの分岐回転を終
 bool retry_chance = true;
 bool retry_chance2 = true;
 
-geometry_msgs::Point marking;
+visualization_msgs::Marker marker3;
+
 
 void odom_marking(float x, float y){
-	uint32_t list = visualization_msgs::Marker::LINE_LIST;
-	visualization_msgs::Marker marker3;
+
+	uint32_t list = visualization_msgs::Marker::LINE_STRIP;
+	geometry_msgs::Point marking;
 	marker3.header.frame_id = "map";
 	marker3.header.stamp = ros::Time::now();
 	marker3.ns = "basic_shapes";
@@ -149,6 +167,16 @@ void odom_marking(float x, float y){
 	marking.y = y;
 	marking.z = 0.0;
 	marker3.points.push_back(marking);
+
+/*
+	marking.x = 0.0;
+	marking.y = 0.0;
+	marking.z = 0.0;
+	marker3.points.push_back(marking);
+
+	//marker3.points.insert(marker3.points.end(),odom_log.begin(),odom_log.end());
+	*/
+
 	marker_pub.publish(marker3);
 }
 
@@ -561,6 +589,9 @@ void odom_callback(const geometry_msgs::Point::ConstPtr& odom_msg){
 	odom_x = odom_msg -> x;
 	odom_y = odom_msg -> y;
 	yaw = odom_msg -> z;
+	//odom.x = odom_x;
+	//odom.y = odom_y;
+	//odom.z = 0.0;
 }
 
 void vel_recovery(){
@@ -653,7 +684,7 @@ void vel_curve_VFH_g(float rad_min ,float angle_max){
 	float rho;
 	float theta_rho;
 	float omega;
-	float t = 0.6;
+	float t = 1.0;
 
 	pre_theta = theta;
 
@@ -681,6 +712,8 @@ void vel_curve_VFH_g(float rad_min ,float angle_max){
 	odom_queue.callOne(ros::WallDuration(1));
 	
 
+
+	//odom_log.push_back(odom);	
 	odom_log_x.push_back(odom_x);
 	odom_log_y.push_back(odom_y);
 	
@@ -733,7 +766,7 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 
 	odom_queue.callOne(ros::WallDuration(1));
 	
-
+	//odom_log.push_back(odom);
 	odom_log_x.push_back(odom_x);
 	odom_log_y.push_back(odom_y);
 	
@@ -783,6 +816,23 @@ void duplicated_point_detection(){
 			return;
 		}
 	}
+
+/*
+	for(int i=0;i<odom_log.size();i++){
+		//過去のオドメトリが許容範囲の中に入っているか//
+		if((x_margin_plus > odom_log[i].x) && (x_margin_minus < odom_log[i].x)){
+			if((y_margin_plus > odom_log[i].y) && (y_margin_minus < odom_log[i].y)){
+				duplication_flag = true;
+			}
+		}
+
+		if(duplication_flag){
+			branch_find_flag = false;
+			std::cout << "すでに探査した領域でした・・・ぐすん;;" << std::endl;
+			return;
+		}
+	}
+*/
 	
 }
 
@@ -1215,6 +1265,53 @@ void scan_retry(const sensor_msgs::LaserScan::ConstPtr& re_scan_msg){
 	goal_angle_v = VFH_move_angle_g(ranges,angle_min,angle_increment,all_nan,gra_angle,angles);
 }
 
+void scan_rotate_callback(const sensor_msgs::LaserScan::ConstPtr& src_msg){
+	float plus_ave;
+	float minus_ave;
+	float sum = 0;
+
+	std::vector<float> ranges = src_msg->ranges;
+
+	approx(ranges);
+
+	//minus側の平均
+	for(int i=0;i<ranges.size()/2;i++){
+		if(!isnan(ranges[i])){	
+			sum += ranges[i];
+		}
+	}
+	minus_ave = sum/(ranges.size()/2);
+	
+	sum = 0;
+
+	//plus側
+	for(int i=ranges.size()/2;i<ranges.size();i++){
+		if(!isnan(ranges[i])){
+			sum += ranges[i];
+		}
+	}
+	plus_ave = sum/(ranges.size()/2);
+
+	//平均を比較
+
+	std::cout << "plus_ave:" << plus_ave << std::endl;
+	std::cout << "minus_ave:" << minus_ave << std::endl;
+
+	if(plus_ave > minus_ave){
+		std::cout << "plusに回転\n" << std::endl;
+		Emergency_avoidance = 1.0;
+	}
+	else if(plus_ave < minus_ave){
+		std::cout << "minusに回転\n" << std::endl;
+		Emergency_avoidance = -1.0;
+	}
+	else{
+		std::cout << "無理です\n" << std::endl;	
+		undecided_rotate = true;
+	}
+}
+
+
 
 void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の影響を受けた目標角度を決める
 	vfh_gra_x = goal_point_x - odom_x;
@@ -1258,13 +1355,23 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 		re++;
 	}
 */
-	if(goal_angle_v >= all_nan){
-		vel_recovery_g();
-	}
-	else if(bumper_hit){
-		vel_recovery_g();
-	}
 
+	//scan_rotate_queue.callOne(ros::WallDuration(1));
+
+
+	if(bumper_hit){
+		vel_recovery_g();
+	}
+	else if(goal_angle_v >= all_nan){
+		scan_rotate_queue.callOne(ros::WallDuration(1));
+		if(undecided_rotate){
+			vel_recovery_g();
+			undecided_rotate = false;
+		}
+		else{
+			vel_curve_VFH(Emergency_avoidance*angle_max/6,angle_max);
+		}
+	}
 	else{
 		need_back = true;
 		need_rotate_calc = true;
@@ -1280,7 +1387,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 
 void VFH4vel_publish_Branch(){
 	const float goal_margin = 0.5;
-	const float gra_enable = std::abs(goal_y)*1.3;
+	const float gra_enable = std::abs(goal_y)+0.8;
 	const float gra_force = 6.0;
 	float now2goal_dis =100;
 	float pre_now2goal_dis;
@@ -1448,13 +1555,21 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 	retry_chance =true;
 	retry_chance2 =true;
 */
-	if(m_angle >= all_nan){
-		vel_recovery();
-	}
-	else if(bumper_hit){
-		vel_recovery();
-	}
 
+
+	if(bumper_hit){
+		vel_recovery();
+	}
+	else if(m_angle >= all_nan){
+		scan_rotate_queue.callOne(ros::WallDuration(1));
+		if(undecided_rotate){
+			vel_recovery();
+			undecided_rotate = false;
+		}
+		else{
+			vel_curve_VFH(-Emergency_avoidance*angle_min/6,-angle_min);
+		}
+	}
 	else{
 		need_back = true;
 		need_rotate_calc = true;
@@ -1512,8 +1627,12 @@ int main(int argc, char** argv){
 	re_scan_sub = s.subscribe(re_scan_option);
 
 
+	scan_rotate_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,scan_rotate_callback,ros::VoidPtr(),&scan_rotate_queue);
+	scan_rotate_sub = s.subscribe(scan_rotate_option);
+
 	vel_pub = s.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1);
 	marker_pub = s.advertise<visualization_msgs::Marker>("visualization_marker", 1);
+	//marker2_pub = s.advertise<visualization_msgs::Marker>("visualization_marker2", 1);
 
 	vel.linear.y = 0;
 	vel.linear.z = 0;

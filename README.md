@@ -1,5 +1,6 @@
 # hybrid_exploration
-* testing on the turtlebot with SLAM <br><br>
+* Autonomous SLAM
+* testing on the kobuki
 
 ## run(after activating turtlebot and SLAM) <br>
 * hybrid exploration(switch from sensor-based to frontier-based)

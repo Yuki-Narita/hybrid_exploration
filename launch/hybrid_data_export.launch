@@ -1,4 +1,0 @@
-<launch>
- <node pkg="hybrid_exploration" type="hybrid_exploration" name="hybrid_exploration" output="screen" />
- <node pkg="hybrid_exploration" type="data_export" name="data_export" />
-</launch>

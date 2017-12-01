@@ -205,14 +205,14 @@ include_directories(
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
-add_executable(hybrid_exploration src/hybrid_exploration.cpp)
-target_link_libraries(hybrid_exploration ${catkin_LIBRARIES})
+#add_executable(hybrid_exploration src/hybrid_exploration.cpp)
+#target_link_libraries(hybrid_exploration ${catkin_LIBRARIES})
 
-add_executable(hybrid_sensor_based_exploration src/sensor_based_exploration.cpp)
-target_link_libraries(hybrid_sensor_based_exploration ${catkin_LIBRARIES})
+#add_executable(hybrid_sensor_based_exploration src/sensor_based_exploration.cpp)
+#target_link_libraries(hybrid_sensor_based_exploration ${catkin_LIBRARIES})
 
-add_executable(hybrid_vector_explore_program src/vector_explore_program.cpp)
-target_link_libraries(hybrid_vector_explore_program ${catkin_LIBRARIES})
+#add_executable(hybrid_vector_explore_program src/vector_explore_program.cpp)
+#target_link_libraries(hybrid_vector_explore_program ${catkin_LIBRARIES})
 
 add_executable(hybrid_new_vector_explore_program src/new_vector_explore_program.cpp)
 target_link_libraries(hybrid_new_vector_explore_program ${catkin_LIBRARIES})

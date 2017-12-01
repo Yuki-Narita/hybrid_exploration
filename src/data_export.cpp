@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include <nav_msgs/Odometry.h>
+#include <geometry_msgs/Point.h>
 #include <fstream>
 #include <ros/callback_queue.h>
 #include <nav_msgs/OccupancyGrid.h>
@@ -41,16 +41,16 @@ void map_data(const nav_msgs::OccupancyGrid::ConstPtr& map_data){
 	explored_cell = m_per_cell*m_per_cell*explored_cell_num;
 }
 
-void odom_data(const nav_msgs::Odometry::ConstPtr& odom_data){
-	odom_x = odom_data->pose.pose.position.x;
-	odom_y = odom_data->pose.pose.position.y;
+void odom_data(const geometry_msgs::Point::ConstPtr& odom_data){
+	odom_x = odom_data-> x;
+	odom_y = odom_data-> y;
 }
 
 int main(int argc, char** argv){
 	ros::init(argc, argv, "data_export");
 	ros::NodeHandle d;
 
-	odom_data_option = ros::SubscribeOptions::create<nav_msgs::Odometry>("/odom",1,odom_data,ros::VoidPtr(),&odom_data_queue);
+	odom_data_option = ros::SubscribeOptions::create<geometry_msgs::Point>("/odom_support",1,odom_data,ros::VoidPtr(),&odom_data_queue);
 	map_data_option = ros::SubscribeOptions::create<nav_msgs::OccupancyGrid>("/map",1,map_data,ros::VoidPtr(),&map_data_queue);
 
 	odom_data_sub = d.subscribe(odom_data_option);
@@ -67,7 +67,7 @@ int main(int argc, char** argv){
 	ofs << "odom_x,odom_y,探査済み面積[m*m]" << std::endl;
 
 
-	ros::Rate rate(1);
+	ros::Rate rate(0.5);
 
 	while(ros::ok()){
 		odom_data_queue.callOne(ros::WallDuration(1));

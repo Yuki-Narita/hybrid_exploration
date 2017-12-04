@@ -42,6 +42,7 @@ ros::SubscribeOptions scan_rotate_option;
 ros::Subscriber scan_rotate_sub;
 
 geometry_msgs::Twist vel;
+visualization_msgs::Marker marker3;
 
 float Emergency_avoidance = 0;
 bool undecided_rotate = false;
@@ -79,20 +80,13 @@ const float forward_vel = 0.2;//前進速度[m/s]
 const float rotate_vel = 0.5;//回転速度[rad\s]
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
 const float forward_dis = 0.8;//一回のVFHで前方向に進む距離[m]
-const int div_num = 2;//VFHでカーブを行うときに目的地までの距離を分割する数(偶数)
 const float scan_threshold = 0.8;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
 const float safe_space = 0.45;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
-const float side_dis = 0.375;//VFH_curveの横方向制限
-const float origin_dis = 0.375;//VFH_curveの横方向制限
 
 bool move_success = false;
 
 bool bumper_hit = false;
 int which_bumper = 0;
-geometry_msgs::Point marking;
-
-
-
 
 //引力を考慮した回転方向が決まったらこの関数を使う//地図情報に基づいて回転方向を決定//引力方向に回ると反転しそうだったら//両側にあったら引力
 void rotation_based_map(const nav_msgs::OccupancyGrid::ConstPtr& map_msg){
@@ -190,7 +184,7 @@ void rotation_based_map(const nav_msgs::OccupancyGrid::ConstPtr& map_msg){
 
 void odom_marking(float x, float y){
 	uint32_t list = visualization_msgs::Marker::LINE_STRIP;
-	visualization_msgs::Marker marker3;
+	geometry_msgs::Point marking;
 	marker3.header.frame_id = "map";
 	marker3.header.stamp = ros::Time::now();
 	marker3.ns = "basic_shapes";
@@ -427,21 +421,10 @@ void vel_recovery(){
 	}
 }
 
-
 void vel_curve_VFH_e(float rad_min ,float angle_max){
 	const float theta = rad_min;
 	const float v = forward_vel;
-	
-	float y = origin_dis*pow(cos(rad_min),2);
-	bool d = true;	
-	
-	if(std::abs(rad_min) > (angle_max/2)){
-		y = side_dis * cos(rad_min) / std::abs(sin(rad_min));
-		std::cout << "y_side: " << y << std::endl;
-		d = false;
-	}
-	float y_div = y/div_num;
-	float rho;
+
 	float theta_rho;
 	float omega;
 	float t = 0.2;
@@ -449,10 +432,7 @@ void vel_curve_VFH_e(float rad_min ,float angle_max){
 	pre_theta = theta;
 
 	theta_rho = 2*theta;
-	rho = y_div/sin(theta_rho);
-	omega = v/rho;
 	omega = theta_rho/t;
-	//t = theta_rho/omega;
 
 	vel.linear.x = v;
 	vel.angular.z = omega;
@@ -462,29 +442,18 @@ void vel_curve_VFH_e(float rad_min ,float angle_max){
 	std::cout << vel.linear.x << "(v_debag)" << std::endl;
 	std::cout << vel.angular.z << "(o_debag)" << std::endl;
 
-	for(int i=0;i<(div_num/2);i++){
-		for(int k=0;k<1;k++){
-			vel_pub.publish(vel);
-		}
-		std::cout << "障害物を回避しながら移動中♪" << std::endl;
-	}
+	vel_pub.publish(vel);
+	std::cout << "障害物を回避しながら移動中♪" << std::endl;
+
+	odom_queue.callOne(ros::WallDuration(1));
+	odom_marking(odom_x,odom_y);
 }
 
 
 void vel_curve_VFH(float rad_min ,float angle_max){
 	const float theta = rad_min;
 	const float v = forward_vel;
-	
-	float y = origin_dis*pow(cos(rad_min),2);
-	bool d = true;	
-	
-	if(std::abs(rad_min) > (angle_max/2)){
-		y = side_dis * cos(rad_min) / std::abs(sin(rad_min));
-		std::cout << "y_side: " << y << std::endl;
-		d = false;
-	}
-	float y_div = y/div_num;
-	float rho;
+
 	float theta_rho;
 	float omega;
 	float t = 1.0;
@@ -492,10 +461,7 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	pre_theta = theta;
 
 	theta_rho = 2*theta;
-	rho = y_div/sin(theta_rho);
-	omega = v/rho;
 	omega = theta_rho/t;
-	//t = theta_rho/omega;
 
 	vel.linear.x = v;
 	vel.angular.z = omega;
@@ -505,34 +471,21 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	std::cout << vel.linear.x << "(v_debag)" << std::endl;
 	std::cout << vel.angular.z << "(o_debag)" << std::endl;
 
-	for(int i=0;i<(div_num/2);i++){
-		for(int k=0;k<1;k++){
-			vel_pub.publish(vel);
-		}
-		std::cout << "障害物を回避しながら移動中♪" << std::endl;
-	}
+	vel_pub.publish(vel);
+	std::cout << "障害物を回避しながら移動中♪" << std::endl;
+
+
+	odom_queue.callOne(ros::WallDuration(1));
+	odom_marking(odom_x,odom_y);
 }
 
 float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_increment, float all_nan, float gra_angle, std::vector<float> &angles){
-	float rad_start;
-	float rad_end;
-	float rad_diff;
-	float rad_chord;
-	float rad_center;
-	float rad_center_abs;
-	float rad_min_abs = all_nan;
 	float rad_min = all_nan;
 	int i;
-	float rad_gra_diff_abs;
-	float rad_gra_diff;
-	float rad_c_g;
-	float rad_c_g_deb;
 	float over_rad;
-	//float gra_angle_r;
 	int near_i;
 	float gra_angle_abs = 3.14;
 	float gra_angle_diff;
-	float tmp_safe_num;
 	int safe_num;
 	int rad_counter = 0;
 	int start_i;
@@ -546,22 +499,6 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 	float ang_g;
 	int l;
 	
-/*
-	for(i=0;i<ranges.size();i++){
-		//export_data(angle_min+(angle_increment*i),ranges[i]);
-		if(isnan(ranges[i])){
-			if(isnan(ranges[i+1])){
-				ranges[i] = 0;
-			}
-			else{
-				ranges[i] = ranges[i+1];
-			}
-		}
-		if(ranges[i] >= scan_threshold){
-			ranges[i] = scan_threshold;		
-		}
-	}
-*/
 //gra_angleを中心にして±に角度を見ていって先にロボットの直径分の空間が見つかったらその時点でその中心を目標にする
 //gra_angleをロボットの座標軸で表すgra_angle_r
 	
@@ -584,10 +521,7 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 		}
 	}
 //安全な角度を作るために必要な個数
-	
-	//tmp_safe_num = (asin((safe_space)/(2*scan_threshold))) / angle_increment ;
-	tmp_safe_num = (asin((safe_space)/(2*forward_dis))) / angle_increment ;
-	safe_num = tmp_safe_num;
+	safe_num = (asin((safe_space)/(2*forward_dis))) / angle_increment ;
 	std::cout << "angle_increment:" << angle_increment << ",scan_threshold:" << scan_threshold << std::endl;
 //gra_angle_rに一番近いiから±に安全角度を見つける,プラス側に行って半径分領域があったらそのマイナス側に半径分の領域があるかを見る
 	//先にプラス側を見る
@@ -615,15 +549,9 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 					break;
 				}	
 			}
-		}/*
-		else{
-			i++;
-		}*/
+		}
 	}
 	//std::cout << "plusのfor抜けた" << std::endl;
-
-
-
 
 	for(i=near_i;i>=0;i--){
 		//std::cout << "minusのfor" << std::endl;
@@ -648,9 +576,6 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 					break;
 				}	
 			}
-		}
-		else{
-			i--;
 		}
 	}
 	//std::cout << "minusのfor抜けた" << std::endl;
@@ -838,13 +763,10 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 	float rad;
 	std::vector<float> angles;
 
-	//スキャンデータを極座標から直交座標に直すやつ///
 	for(int i=0;i<ranges.size();i++){
 		rad = angle_min+(angle_increment*i);
-		//ranges[i] = ranges[i] * cos(rad);
 		angles.push_back(rad);
 	}
-	/////////////////////
 
 	approx(ranges);
 
@@ -871,47 +793,28 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 		need_rotate_calc = true;
 		vel_curve_VFH(goal_angle, angle_max);	
 	}
-
-
-	//自分のヨー角をみてタンジェントの角が第何象限にあるかを考える
-	//VFHで見つかった安全な角度の中から最も引力の向きに近い角度を目標角度に設定する
-
 }
 
 void VFH_navigation(float goal_x, float goal_y){
 	goal_point_x = goal_x;
 	goal_point_y = goal_y;
 	const float goal_margin = 0.7;
-	bool finish_flag = false;
 	float now2goal_dis;
-
-	/*goal_point_x = 1.7;
-	goal_point_y = -0.7;
-*/
 
 	std::cout << "目標へ移動開始" << std::endl;
 	std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
 	odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得
 	std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
 	
-	while(!finish_flag && ros::ok()){
-		odom_marking(odom_x,odom_y);
-		//std::cout << "1" << std::endl;
+	while(now2goal_dis > goal_margin && ros::ok()){
 		scan_queue.callOne(ros::WallDuration(1));//重力の影響を受けた進行方向を決めて速度を送る
-		//std::cout << "2" << std::endl;
 		odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得
-		//std::cout << "3" << std::endl;
 		std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
 		std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
 		now2goal_dis = sqrt(pow(goal_x-odom_x,2)+pow(goal_y-odom_y,2));
-		if(now2goal_dis < goal_margin){
-			//finish_flag = true;
-			move_success = true;
-			break;
-		}
 	}
+	move_success = true;
 	std::cout << "目標へ移動終了" << std::endl;
-	
 }
 
 void odom_callback(const geometry_msgs::Point::ConstPtr& odom_msg){
@@ -941,27 +844,12 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 	float EVA_max;//評価式の最大値
 	int goal_num;//目標地点の座標番号
 	bool first_calc;
-	float far_x;
-	float far_y;
 	float x_tmp;
 	float y_tmp;
 	float dis_tmp;
 	int i;
-	int num = 0;
-	float dis_rad;
-	bool nav_success;
-	float dis_for_view;
-	int retry_counter = 0;
-	bool debag = false;
-
-	float distance;
-		
 
 	std::cout << "start:far_frontier"  << std::endl;
-	
-	//std::cout << "＊＊＊＊＊＊＊＊＊＊現在の探査半径 (" << search_radius << " m )＊＊＊＊＊＊＊＊＊＊" << std::endl;
-
-	distance=100;
 	
 	if(fro_num_tmp == 0){
 		std::cout << "未探査座標が無いからskipしたよ"  << std::endl;
@@ -976,10 +864,7 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 	ro_y_map = odom_y;
 
 	std::cout << "現在座標 (" << ro_x_map << "," << ro_y_map <<  ")" <<std::endl;
-
 	std::cout << "end  :ロボットの現在座標を取得" << std::endl;
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 //現在位置から各目標に対してのベクトルを計算し、前回の移動と近い目標を探す///////////////////////////////////////////////
@@ -1001,29 +886,27 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 	first_calc = true;
 
 	for(i=0;i<fro_num_tmp;i++){
-		//dis_rad = sqrt(pow(fro_x_tmp[i], 2) + pow(fro_y_tmp[i],2));
-		//if(dis_rad <= search_radius){
-			x_tmp = fro_x_tmp[i] - ro_x_map;
-			y_tmp = fro_y_tmp[i] - ro_y_map;
-			dis_tmp = sqrt(pow(x_tmp, 2) + pow(y_tmp,2));
-			dot_tmp = (x_tmp*pre_vector_x + y_tmp*pre_vector_y)/dis_tmp;
-			dot.push_back(dot_tmp);
-			length.push_back(dis_tmp);
-			i_list.push_back(i);
+		x_tmp = fro_x_tmp[i] - ro_x_map;
+		y_tmp = fro_y_tmp[i] - ro_y_map;
+		dis_tmp = sqrt(pow(x_tmp, 2) + pow(y_tmp,2));
+		dot_tmp = (x_tmp*pre_vector_x + y_tmp*pre_vector_y)/dis_tmp;
+		dot.push_back(dot_tmp);
+		length.push_back(dis_tmp);
+		i_list.push_back(i);
 			
-			point_num++;
+		point_num++;
 	
-			if(first_calc){
-				dot_max = std::abs(dot_tmp);
-				length_max = dis_tmp;
-				first_calc = false;
-			}
-			if(std::abs(dot_tmp)>dot_max){
-				dot_max = std::abs(dot_tmp);
-			}
-			if(dis_tmp>length_max){
-				length_max = dis_tmp;
-			}
+		if(first_calc){
+			dot_max = std::abs(dot_tmp);
+			length_max = dis_tmp;
+			first_calc = false;
+		}
+		if(std::abs(dot_tmp)>dot_max){
+			dot_max = std::abs(dot_tmp);
+		}
+		if(dis_tmp>length_max){
+			length_max = dis_tmp;
+		}
 	}
 
 skip:
@@ -1062,9 +945,6 @@ skip:
 	//std::cout << "＊＊＊＊＊＊＊＊＊＊現在の探査半径 (" << search_radius << " m )＊＊＊＊＊＊＊＊＊＊" << std::endl;
 	std::cout << "現在座標 (" << ro_x_map << "," << ro_y_map <<  ")" <<std::endl;
 
-
-
-
 ////////////////////////*******//ここで経路作成関数に目標を渡す///******////////////////////////////////
 	VFH_navigation(fro_x_tmp[goal_num], fro_y_tmp[goal_num]);
 
@@ -1079,12 +959,8 @@ skip:
 		pre_vector_y = odom_y - ro_y_map;
 	}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
 	std::cout << "end  :far_frontier" << std::endl;
 }
-
-
 
 //フロンティアを検索する関数//////////////////////////////////////////////////////////////////////////////////////////
 void frontier_search(const nav_msgs::OccupancyGrid::ConstPtr& msg){
@@ -1094,8 +970,6 @@ void frontier_search(const nav_msgs::OccupancyGrid::ConstPtr& msg){
 	const std::vector<int8_t> data = msg->data;//地図の値を取得
 	const int x = info.width;//地図の横サイズ
 	const int y = info.height;//地図の縦サイズ
-
-
 	int fro_num;
 	std::vector<float> fro_x;//見つけたフロンティアのx座標
 	std::vector<float> fro_y;//見つけたフロンティアのy座標	

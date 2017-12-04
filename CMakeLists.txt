@@ -220,6 +220,9 @@ target_link_libraries(hybrid_new_vector_explore_program ${catkin_LIBRARIES})
 add_executable(data_export src/data_export.cpp)
 target_link_libraries(data_export ${catkin_LIBRARIES})
 
+#add_executable(data_export_bridge src/data_export_bridge.cpp)
+#target_link_libraries(data_export_bridge ${catkin_LIBRARIES})
+
 add_executable(hybrid_odometry_on_map src/odometry_on_map.cpp)
 target_link_libraries(hybrid_odometry_on_map ${catkin_LIBRARIES})
 

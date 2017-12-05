@@ -106,7 +106,7 @@ const float fix_sensor = 0.07;//分岐領域座標設定のときにセンサー
 const float duplication_margin = 1.0;//重複探査の判断をするときの半径[m]←正方形の辺の半分の長さでした
 
 const float scan_branch_limit = 1.5;//分岐方向への回転をセンサデータから行うときにこの値以上だったら数値があっても良い
-const float branch_y_threshold = 2.0;//分岐領域の2点間のｙ座標の差がこの値以下のとき分岐として検出
+const float branch_y_threshold = 4.0;//分岐領域の2点間のｙ座標の差がこの値以下のとき分岐として検出
 
 float scan_angle;//この角度の範囲内に空間があれば回転を終了する
 
@@ -269,6 +269,127 @@ void scan_branch_callback(const sensor_msgs::LaserScan::ConstPtr& scan_Branch_ms
 	std::cout << "rotation_true(debag)" << std::endl;
 }
 
+
+//重複探査検出用
+//void duplicated_point_detection(){
+bool duplicated_point_detection(){
+	float global_x;//分岐領域の世界座標
+	float global_y;//分岐領域の世界座標
+	float x_margin_plus;
+	float x_margin_minus;
+	float y_margin_plus;
+	float y_margin_minus;
+	//bool duplication_flag = false;
+
+	odom_queue.callOne(ros::WallDuration(1));
+
+	global_x = odom_x+(cos(yaw)*goal_x) - (sin(yaw)*goal_y);
+	global_y = odom_y+(cos(yaw)*goal_y) + (sin(yaw)*goal_x);
+
+	x_margin_plus = global_x + duplication_margin;
+	x_margin_minus = global_x - duplication_margin;
+	y_margin_plus = global_y + duplication_margin;
+	y_margin_minus = global_y - duplication_margin;
+
+
+	std::cout << "odom_x,odom_y (" << odom_x << "," << odom_y << ")" << std::endl;
+	std::cout << "goal_x,goal_y (" << goal_x << "," << goal_y << ")" << std::endl;
+	std::cout << "yaw (" << yaw << ")" << std::endl;
+	std::cout << "global_x,global_y (" << global_x << "," << global_y << ")" << std::endl;
+	
+	
+
+	for(int i=0;i<odom_log_x.size();i++){
+		//過去のオドメトリが許容範囲の中に入っているか//
+		if((x_margin_plus >= odom_log_x[i]) && (x_margin_minus <= odom_log_x[i])){
+			if((y_margin_plus >= odom_log_y[i]) && (y_margin_minus <= odom_log_y[i])){
+				//duplication_flag = true;
+				branch_find_flag = false;
+				std::cout << "すでに探査した領域でした・・・ぐすん;;" << std::endl;
+				return true;
+			}
+		}
+		/*if(duplication_flag){
+			branch_find_flag = false;
+			std::cout << "すでに探査した領域でした・・・ぐすん;;" << std::endl;
+			return true;
+		}*/
+	}
+	
+	return false;
+}
+
+//その時刻に見つけた分岐領域を全て保存できるように変更する
+
+void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_angle){
+	int i;
+	int j;
+	int near;
+	float robot_x;
+	float robot_y;
+	float next_robot_x;
+	float next_robot_y;
+	float Branch_dist;
+	float temp_Branch_center_dist;
+	float Branch_center_dist = 10000000000.0;
+	float tmp_goal_x;
+	float tmp_goal_y;
+
+	std::vector<float> branch_x_list;//goal_xを保存
+	std::vector<float> branch_y_list;//goal_yを保存
+
+	goal_x = 0;
+	goal_y = 0;
+
+//はじめのfor文では条件を満たした分岐領域を探す
+//２つ目のfor文で最も近い分岐を選ぶ
+//選んだ最も近い分岐に対して重複探査の確認を行いtrueが帰ってきたらその分岐を除いて再度最も近い分岐を探す
+
+	for(i=0;i<fixed_ranges.size()-1;i++){
+		robot_x = fixed_ranges[i]*cos(fixed_angle[i]);
+		next_robot_x = fixed_ranges[i+1]*cos(fixed_angle[i+1]);
+		if(robot_x <= Branch_range_limit && next_robot_x <= Branch_range_limit){
+			Branch_dist = std::abs(next_robot_x - robot_x);
+			if(Branch_dist >= Branch_threshold){
+				robot_y = fixed_ranges[i]*sin(fixed_angle[i]);
+				next_robot_y = fixed_ranges[i+1]*sin(fixed_angle[i+1]);
+				tmp_goal_y = (next_robot_y + robot_y)/2;
+				if(std::abs(tmp_goal_y) <= branch_y_threshold){//branch_y_thresholdは大きめにしてもいいかも
+					tmp_goal_x = (next_robot_x + robot_x)/2;
+					branch_x_list.push_back(tmp_goal_x);
+					branch_y_list.push_back(tmp_goal_y);
+					branch_find_flag = true;
+				}
+			}
+		}
+	}
+
+	if(branch_find_flag){
+		for(int k=branch_x_list.size();k>0;k--){
+			for(j=0;j<branch_x_list.size();j++){
+				temp_Branch_center_dist = std::abs(branch_x_list[j])+std::abs(branch_y_list[j]);
+				if(temp_Branch_center_dist <= Branch_center_dist){
+					Branch_center_dist = temp_Branch_center_dist;
+					goal_x = branch_x_list[j];
+					goal_y = branch_y_list[j];
+					near = j;
+				}
+			}
+			if(duplicated_point_detection()){
+				branch_x_list.erase(branch_x_list.begin() + j);
+				branch_y_list.erase(branch_y_list.begin() + j);
+				branch_find_flag = false;
+			}
+			else{
+				branch_find_flag = true;
+				break;
+			}
+		}	
+	}
+}
+
+/*
+//古いバージョン
 void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_angle){
 	int i;
 	float robot_x;
@@ -276,7 +397,6 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 	float next_robot_x;
 	float next_robot_y;
 	float Branch_dist;
-	float Branch_area;
 	float temp_Branch_center_dist;
 	float Branch_center_dist = 10000000000.0;
 	float tmp_goal_x;
@@ -286,6 +406,9 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 	float debag_robot_y = 0;
 	float debag_next_robot_x = 0;
 	float debag_next_robot_y = 0;
+
+
+//複数の分岐領域を保存できるようにする
 
 	goal_x = 0;
 	goal_y = 0;
@@ -326,7 +449,7 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 	std::cout << "robot_y: " << debag_robot_y << std::endl;
 	std::cout << "next_robot_x: " << debag_next_robot_x << std::endl;
 	std::cout << "next_robot_y: " << debag_next_robot_y << std::endl;
-}
+}*/
 
 float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_increment, float all_nan, std::vector<float> &angles){
 	float rad_min = all_nan;
@@ -662,48 +785,6 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 
 }
 
-//重複探査検出用
-void duplicated_point_detection(){
-	float global_x;//分岐領域の世界座標
-	float global_y;//分岐領域の世界座標
-	float x_margin_plus;
-	float x_margin_minus;
-	float y_margin_plus;
-	float y_margin_minus;
-	bool duplication_flag = false;
-
-	odom_queue.callOne(ros::WallDuration(1));
-
-	global_x = odom_x+(cos(yaw)*goal_x) - (sin(yaw)*goal_y);
-	global_y = odom_y+(cos(yaw)*goal_y) + (sin(yaw)*goal_x);
-
-	x_margin_plus = global_x + duplication_margin;
-	x_margin_minus = global_x - duplication_margin;
-	y_margin_plus = global_y + duplication_margin;
-	y_margin_minus = global_y - duplication_margin;
-
-
-	std::cout << "odom_x,odom_y (" << odom_x << "," << odom_y << ")" << std::endl;
-	std::cout << "goal_x,goal_y (" << goal_x << "," << goal_y << ")" << std::endl;
-	std::cout << "yaw (" << yaw << ")" << std::endl;
-	std::cout << "global_x,global_y (" << global_x << "," << global_y << ")" << std::endl;
-	
-	
-
-	for(int i=0;i<odom_log_x.size();i++){
-		//過去のオドメトリが許容範囲の中に入っているか//
-		if((x_margin_plus >= odom_log_x[i]) && (x_margin_minus <= odom_log_x[i])){
-			if((y_margin_plus >= odom_log_y[i]) && (y_margin_minus <= odom_log_y[i])){
-				duplication_flag = true;
-			}
-		}
-		if(duplication_flag){
-			branch_find_flag = false;
-			std::cout << "すでに探査した領域でした・・・ぐすん;;" << std::endl;
-			return;
-		}
-	}	
-}
 
 void approx(std::vector<float> &scan){
 	float depth,depth1,depth2;
@@ -1247,12 +1328,13 @@ void Branch_area_callback(const sensor_msgs::LaserScan::ConstPtr& Branch_msg){
 	
 	if(branch_find_flag){
 		std::cout << "みーつけた!!" << std::endl;
-		std::cout << "*****角度 " << goal_angle*180/3.141592 << " [deg] " << " 座標 (" << goal_x << "," << goal_y << ")*****" << std::endl;
-		duplicated_point_detection();
+		//std::cout << "*****角度 " << goal_angle*180/3.141592 << " [deg] " << " 座標 (" << goal_x << "," << goal_y << ")*****" << std::endl;
+		std::cout << "ロボット座標系 (" << goal_x << "," << goal_y << ")*****" << std::endl;
+		//duplicated_point_detection();
 
-		if(branch_find_flag){
-			VFH4vel_publish_Branch();
-		}
+		//if(branch_find_flag){
+		VFH4vel_publish_Branch();
+		//}
 	}
 	else{
 		std::cout << "う〜ん、無いな〜" << std::endl;

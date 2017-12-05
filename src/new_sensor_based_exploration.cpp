@@ -94,7 +94,7 @@ const float forward_vel = 0.2;//前進速度[m/s]
 const float rotate_vel = 0.5;//回転速度[rad\s]
 //VFH関連のパラメータ///
 const float scan_threshold = 1.2;//0.8;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
-const float forward_dis = 0.8;//0.8;//一回のVFHで前方向に進む距離[m]
+const float forward_dis = 0.75;//0.8;//一回のVFHで前方向に進む距離[m]
 const float back_vel = -0.2;//VFHで全部nanだったときの後退速度[m/s]
 const float back_time = 0.5;//VFHで全部nanだったときに後退する時間[s]
 //分岐領域関連のパラメータ///
@@ -558,6 +558,40 @@ void vel_recovery(){
 
 		scan_rotation_ok = false;
 	}
+}
+
+
+void vel_curve_VFH_e(float rad_min ,float angle_max){
+	const float theta = rad_min;
+	const float v = forward_vel;
+
+	float theta_rho;
+	float omega;
+	float t = 0.3;
+
+	pre_theta = theta;
+
+	theta_rho = 2*theta;
+	omega = theta_rho/t;
+
+	vel.linear.x = v;
+	vel.angular.z = omega;
+
+	std::cout << theta << "(theta_debag)" << std::endl;
+	std::cout << t << "(t_debag)" << std::endl;
+	std::cout << vel.linear.x << "(v_debag)" << std::endl;
+	std::cout << vel.angular.z << "(o_debag)" << std::endl;
+
+	vel_pub.publish(vel);
+	std::cout << "障害物を回避しながら移動中♪" << std::endl;
+
+	odom_queue.callOne(ros::WallDuration(1));
+		
+	odom_log_x.push_back(odom_x);
+	odom_log_y.push_back(odom_y);
+	
+	odom_marking(odom_x,odom_y);
+
 }
 
 
@@ -1097,7 +1131,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 		}
 		else{
 			//vel_curve_VFH(Emergency_avoidance*angle_max/6,angle_max);
-			vel_curve_VFH_g(Emergency_avoidance*angle_max/6,angle_max);
+			vel_curve_VFH_e(Emergency_avoidance*angle_max/6,angle_max);
 		}
 	}
 	else{
@@ -1261,7 +1295,7 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 		}
 		else{
 			//vel_curve_VFH(-Emergency_avoidance*angle_min/6,-angle_min);
-			vel_curve_VFH_g(-Emergency_avoidance*angle_min/6,-angle_min);
+			vel_curve_VFH_e(-Emergency_avoidance*angle_min/6,-angle_min);
 		}
 	}
 	else{

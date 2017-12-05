@@ -82,7 +82,7 @@ float pre_loop_y = 0;
 
 float pre_theta = 0;
 
-const float safe_space = 0.45;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
+const float safe_space = 0.50;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
 
 int which_bumper = 0;
 bool bumper_hit = false;
@@ -93,12 +93,12 @@ const float PI = 3.1415926;//円周率π
 const float forward_vel = 0.2;//前進速度[m/s]
 const float rotate_vel = 0.5;//回転速度[rad\s]
 //VFH関連のパラメータ///
-const float scan_threshold = 0.8;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
-const float forward_dis = 0.8;//一回のVFHで前方向に進む距離[m]
+const float scan_threshold = 1.2;//0.8;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
+const float forward_dis = 0.8;//0.8;//一回のVFHで前方向に進む距離[m]
 const float back_vel = -0.2;//VFHで全部nanだったときの後退速度[m/s]
 const float back_time = 0.5;//VFHで全部nanだったときに後退する時間[s]
 //分岐領域関連のパラメータ///
-const float Branch_threshold = 1.0;//分岐領域の判断をする距離差の閾値[m]
+const float Branch_threshold = 1.2;//1.0;//分岐領域の判断をする距離差の閾値[m]
 const float Branch_range_limit = 5.0;//分岐領域の判断を行う距離の最大値(分岐がこの値以上遠くにあっても認識しない)[m]
 const float branch_obst_limit = 1.0;//スキャンデータの中心がこの値以下のとき分岐領域を検出しない[m]
 const float fix_sensor = 0.07;//分岐領域座標設定のときにセンサーから取れる距離の誤差を手前に補正(センサー値からマイナスする)[m]
@@ -601,7 +601,7 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	
 	float theta_rho;
 	float omega;
-	float t = 0.2;
+	float t = 0.5;
 
 	pre_theta = theta;
 
@@ -658,8 +658,8 @@ void duplicated_point_detection(){
 
 	for(int i=0;i<odom_log_x.size();i++){
 		//過去のオドメトリが許容範囲の中に入っているか//
-		if((x_margin_plus > odom_log_x[i]) && (x_margin_minus < odom_log_x[i])){
-			if((y_margin_plus > odom_log_y[i]) && (y_margin_minus < odom_log_y[i])){
+		if((x_margin_plus >= odom_log_x[i]) && (x_margin_minus <= odom_log_x[i])){
+			if((y_margin_plus >= odom_log_y[i]) && (y_margin_minus <= odom_log_y[i])){
 				duplication_flag = true;
 			}
 		}
@@ -1096,7 +1096,8 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 			undecided_rotate = false;
 		}
 		else{
-			vel_curve_VFH(Emergency_avoidance*angle_max/6,angle_max);
+			//vel_curve_VFH(Emergency_avoidance*angle_max/6,angle_max);
+			vel_curve_VFH_g(Emergency_avoidance*angle_max/6,angle_max);
 		}
 	}
 	else{
@@ -1259,7 +1260,8 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 			undecided_rotate = false;
 		}
 		else{
-			vel_curve_VFH(-Emergency_avoidance*angle_min/6,-angle_min);
+			//vel_curve_VFH(-Emergency_avoidance*angle_min/6,-angle_min);
+			vel_curve_VFH_g(-Emergency_avoidance*angle_min/6,-angle_min);
 		}
 	}
 	else{

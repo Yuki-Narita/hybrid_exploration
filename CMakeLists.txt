@@ -243,3 +243,6 @@ target_link_libraries(hybrid_tf_odom2map ${catkin_LIBRARIES})
 
 add_executable(hybrid_tf_odom2map_support src/tf_odom2map_support.cpp)
 target_link_libraries(hybrid_tf_odom2map_support ${catkin_LIBRARIES})
+
+add_executable(hybrid_odom_marker src/odom_marker.cpp)
+target_link_libraries(hybrid_odom_marker ${catkin_LIBRARIES})

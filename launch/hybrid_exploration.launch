@@ -4,5 +4,6 @@
 	<node pkg="hybrid_exploration" type="hybrid_odom_support" name="hybrid_odom_support" />
 	<node pkg="hybrid_exploration" type="hybrid_tf_odom2map" name="hybrid_tf_odom2map" />
 	<node pkg="hybrid_exploration" type="hybrid_tf_odom2map_support" name="hybrid_tf_odom2map_support" />
+	<node pkg="hybrid_exploration" type="hybrid_odom_marker" name="hybrid_odom_marker" />
 	<node pkg="hybrid_exploration" type="new_hybrid_exploration" name="new_hybrid_exploration" output="screen" />
 </launch>

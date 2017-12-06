@@ -8,7 +8,7 @@
 #include <kobuki_msgs/BumperEvent.h>
 #include <geometry_msgs/Point.h>
 #include <kobuki_msgs/Led.h>
-
+#include <std_msgs/ColorRGBA.h>
 
 /*パブリッシュ、サブスクライブ関連*/
 ros::CallbackQueue VFH_queue;
@@ -43,9 +43,16 @@ ros::CallbackQueue tf_queue;
 ros::SubscribeOptions tf_option;
 ros::Subscriber tf_sub;
 
+ros::CallbackQueue road_queue;
+ros::SubscribeOptions road_option;
+ros::Subscriber road_sub;
+
+
+
 ros::Publisher vel_pub;
 ros::Publisher marker_pub;
 ros::Publisher led_pub;
+ros::Publisher which_pub;
 
 geometry_msgs::Twist vel;
 visualization_msgs::Marker marker3;
@@ -123,10 +130,12 @@ bool branch_find_flag = false;//分岐領域があるかどうか
 bool need_back = true;//全部nanだったときに最初だけバックする
 bool need_rotate_calc = true;//全部nanだったときの回転方向を計算する必要があるか
 bool scan_rotation_ok = false;//スキャンデータからの分岐回転を終了していいか
+bool find_road_center = false;
 
 void odom_marking(float x, float y){
-	uint32_t list = visualization_msgs::Marker::LINE_STRIP;
-	geometry_msgs::Point marking;
+	//uint32_t list = visualization_msgs::Marker::LINE_STRIP;
+	geometry_msgs::Point marking_point;
+	/*std_msgs::ColorRGBA marking_color;
 	marker3.header.frame_id = "map";
 	marker3.header.stamp = ros::Time::now();
 	marker3.ns = "basic_shapes";
@@ -136,17 +145,25 @@ void odom_marking(float x, float y){
 	marker3.lifetime = ros::Duration(0);
 	marker3.pose.orientation.w = 1.0;
 	marker3.scale.x = 0.1;
+
 	marker3.color.b = 0.0f;
 	marker3.color.a = 1.0;
 	marker3.color.r = 1.0f;
 	marker3.color.g = 1.0f;
 
-	marking.x = x;
-	marking.y = y;
-	marking.z = 0.0;
-	marker3.points.push_back(marking);
+	marking_color.b = 0.0f;
+	marking_color.a = 1.0;
+	marking_color.r = 1.0f;
+	marking_color.g = 1.0f;
+*/
+	marking_point.x = x;
+	marking_point.y = y;
+	marking_point.z = 0.0;
 
-	marker_pub.publish(marker3);
+//	marker3.points.push_back(marking_point);
+//	marker3.colors.push_back(marking_color);
+
+	which_pub.publish(marking_point);
 }
 
 void display_goal_angle(float x, float y){
@@ -1317,8 +1334,61 @@ void VFH4vel_publish_Branch(){
 	led.value = 0;
 	led_pub.publish(led);//分岐に着いたらLED消灯
 
-	branch_find_flag = false;
+	//branch_find_flag = false;
 	display_gravity(odom_x, odom_y);
+}
+
+float road_center_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_angle){
+	float road_threshold = 1.5;
+	float y;
+	float next_y;
+	float goal_angle = 0.0;
+
+	//0番目のx座標から見ていき1.5を超えていた時点でbreak
+	for(int i=0;i<fixed_ranges.size()-1;i++){
+		y = fixed_ranges[i]*sin(fixed_angle[i]);
+		next_y = fixed_ranges[i+1]*sin(fixed_angle[i+1]);
+		if(std::abs(next_y-y) >= road_threshold){
+			goal_angle = (fixed_angle[i]+fixed_angle[i+1])/2;
+			find_road_center = true;
+			break;
+		}
+	}
+	return goal_angle;
+}
+
+void road_center_callback(const sensor_msgs::LaserScan::ConstPtr& road_msg){
+	const float angle_min = road_msg->angle_min;
+	const float angle_increment = road_msg->angle_increment;
+
+	std::vector<float> ranges = road_msg->ranges;
+	std::vector<float> fixed_ranges;
+	std::vector<float> fixed_angle;
+	float goal_angle;
+
+	for(int i=0;i<ranges.size();i++){
+		if(!isnan(ranges[i])){
+			fixed_ranges.push_back(ranges[i]);
+			fixed_angle.push_back(angle_min+(angle_increment*i));
+		}
+	}
+
+	if(fixed_ranges.size() < 2){
+		//std::cout << "skip(debag)" << std::endl;
+		return;
+	}
+
+
+	goal_angle = road_center_search(fixed_ranges,fixed_angle);	
+	
+	if(find_road_center){
+		//見つかったらgoal_angleをVFHに渡す
+		std::cout << "road_center:" << goal_angle << std::endl;
+		vel_curve_VFH(goal_angle ,-angle_min);
+	}
+	else{
+		std::cout << "not_road_center" << std::endl;
+	}
 }
 
 void Branch_area_callback(const sensor_msgs::LaserScan::ConstPtr& Branch_msg){
@@ -1470,9 +1540,15 @@ int main(int argc, char** argv){
 	scan_rotate_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,scan_rotate_callback,ros::VoidPtr(),&scan_rotate_queue);
 	scan_rotate_sub = s.subscribe(scan_rotate_option);
 
+
+	road_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,road_center_callback,ros::VoidPtr(),&road_queue);
+	road_sub = s.subscribe(road_option);
+
+
 	vel_pub = s.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1);
-	led_pub = s.advertise<geometry_msgs::Twist>("/mobile_base/commands/led1", 1);
+	led_pub = s.advertise<kobuki_msgs::Led>("/mobile_base/commands/led2", 1);
 	marker_pub = s.advertise<visualization_msgs::Marker>("visualization_marker", 1);
+	which_pub = s.advertise<geometry_msgs::Point>("/which_based", 1);
 
 	vel.linear.y = 0;
 	vel.linear.z = 0;
@@ -1484,10 +1560,15 @@ int main(int argc, char** argv){
 	}
 
 	while(ros::ok()){
-		if(need_back){
-			Branch_queue.callOne(ros::WallDuration(1));
+		Branch_queue.callOne(ros::WallDuration(1));//分岐領域探す
+		if(!branch_find_flag){//分岐が見つかってない
+			road_queue.callOne(ros::WallDuration(1));
+			if(!find_road_center){//道の中心が見つかってない
+				VFH_queue.callOne(ros::WallDuration(1));
+			}
 		}
-		VFH_queue.callOne(ros::WallDuration(1));
+		branch_find_flag = false;
+		find_road_center = false;
 		tf_queue.callOne(ros::WallDuration(1));
 		if(loop_count == loop_closing_max){
 			std::cout << "ループクロージングを" << loop_closing_max << "回したので終了" << std::endl;

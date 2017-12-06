@@ -12,6 +12,7 @@
 //グローバル変数////////////////////////////////////////////////////////////////////////////////////////////
 ros::Publisher vel_pub;
 ros::Publisher marker_pub;
+ros::Publisher which_pub;
 
 ros::CallbackQueue bumper_queue;
 ros::SubscribeOptions bumper_option;
@@ -183,8 +184,10 @@ void rotation_based_map(const nav_msgs::OccupancyGrid::ConstPtr& map_msg){
 }
 
 void odom_marking(float x, float y){
-	uint32_t list = visualization_msgs::Marker::LINE_STRIP;
+
+//	uint32_t list = visualization_msgs::Marker::LINE_STRIP;
 	geometry_msgs::Point marking;
+/*
 	marker3.header.frame_id = "map";
 	marker3.header.stamp = ros::Time::now();
 	marker3.ns = "basic_shapes";
@@ -198,12 +201,12 @@ void odom_marking(float x, float y){
 	marker3.color.a = 1.0;
 	marker3.color.r = 0.0f;
 	marker3.color.g = 0.0f;
-
+*/
 	marking.x = x;
 	marking.y = y;
-	marking.z = 0.0;
-	marker3.points.push_back(marking);
-	marker_pub.publish(marker3);
+	marking.z = 1.0;
+	//marker3.points.push_back(marking);
+	which_pub.publish(marking);
 }
 
 void bumper(const kobuki_msgs::BumperEvent::ConstPtr& hit_msg){
@@ -1262,7 +1265,7 @@ void frontier_search(const nav_msgs::OccupancyGrid::ConstPtr& msg){
 	std::cout << "end  :frontier_search" << std::endl;
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////	
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 //メイン関数////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1295,7 +1298,7 @@ int main(int argc, char** argv){
 
 	vel_pub = f.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1);
 	marker_pub = f.advertise<visualization_msgs::Marker>("visualization_marker", 1);
-
+	which_pub = f.advertise<geometry_msgs::Point>("/which_based", 1);
 
 	std::cout << "start:探査プログラム" << std::endl;
 
@@ -1303,6 +1306,8 @@ int main(int argc, char** argv){
 	odom_queue.callOne(ros::WallDuration(1));
 	pre_vector_x = cos(yaw);
 	pre_vector_y = sin(yaw);
+
+	
 
 
 	while(!stop && ros::ok()){

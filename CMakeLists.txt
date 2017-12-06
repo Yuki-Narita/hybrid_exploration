@@ -237,3 +237,9 @@ target_link_libraries(hybrid_new_sensor_based_exploration ${catkin_LIBRARIES})
 
 add_executable(new_hybrid_exploration src/new_hybrid_exploration.cpp)
 target_link_libraries(new_hybrid_exploration ${catkin_LIBRARIES})
+
+add_executable(hybrid_tf_odom2map src/tf_odom2map.cpp)
+target_link_libraries(hybrid_tf_odom2map ${catkin_LIBRARIES})
+
+add_executable(hybrid_tf_odom2map_support src/tf_odom2map_support.cpp)
+target_link_libraries(hybrid_tf_odom2map_support ${catkin_LIBRARIES})

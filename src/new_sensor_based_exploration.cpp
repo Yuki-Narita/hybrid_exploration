@@ -112,7 +112,7 @@ float scan_angle;//この角度の範囲内に空間があれば回転を終了�
 
 const float branch_angle = 0.04;//分岐領域を検出するのに必要な障害物がない空間の角度
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
-const int loop_closing_max = 10;//プログラムを切り替えるために必要なループクロージングの回数
+const int loop_closing_max = 5;//プログラムを切り替えるために必要なループクロージングの回数
 
 /*判別用フラグ*/
 bool AI_wakeup = false;//AIの起動演出をするかどうか
@@ -228,6 +228,21 @@ void export_data(float i, float range){
 	ofs << i << "," << range << std::endl;
 }
 
+void tf_callback(const geometry_msgs::Point::ConstPtr& tf_data){
+	float trans_x = tf_data -> x;
+	float trans_y = tf_data -> y;
+
+	std::cout << "x:" << trans_x << "," << "y:" << trans_y << std::endl;
+	
+	if(trans_x != pre_loop_x || trans_y != pre_loop_y){
+		pre_loop_x = trans_x;
+		pre_loop_y = trans_y;
+		loop_count++;
+		std::cout << "ループクロージング" << loop_count << "回目" << std::endl;
+	}
+}
+
+/*
 void tf_callback(const tf2_msgs::TFMessage::ConstPtr& tf_data){
 	float trans_x = tf_data -> transforms[0].transform.translation.x;
 	float trans_y = tf_data -> transforms[0].transform.translation.y;
@@ -246,7 +261,7 @@ void tf_callback(const tf2_msgs::TFMessage::ConstPtr& tf_data){
 			std::cout << "ループクロージング" << loop_count << "回目" << std::endl;
 		}
 	}
-}
+}*/
 
 void scan_branch_callback(const sensor_msgs::LaserScan::ConstPtr& scan_Branch_msg){
 	std::vector<float> ranges = scan_Branch_msg->ranges;
@@ -1422,7 +1437,10 @@ int main(int argc, char** argv){
 	scan_branch_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,scan_branch_callback,ros::VoidPtr(),&scan_branch_queue);
 	scan_branch_sub = s.subscribe(scan_branch_option);
 
-	tf_option = ros::SubscribeOptions::create<tf2_msgs::TFMessage>("/tf",1,tf_callback,ros::VoidPtr(),&tf_queue);
+	//tf_option = ros::SubscribeOptions::create<tf2_msgs::TFMessage>("/tf",1,tf_callback,ros::VoidPtr(),&tf_queue);
+	//tf_sub = s.subscribe(tf_option);
+
+	tf_option = ros::SubscribeOptions::create<geometry_msgs::Point>("/odom2map_support",1,tf_callback,ros::VoidPtr(),&tf_queue);
 	tf_sub = s.subscribe(tf_option);
 
 	scan_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,VFH_gravity,ros::VoidPtr(),&scan_queue);

@@ -799,7 +799,7 @@ void VFH_navigation(float goal_x, float goal_y){
 	goal_point_x = goal_x;
 	goal_point_y = goal_y;
 	const float goal_margin = 0.7;
-	float now2goal_dis;
+	float now2goal_dis = 100.0;
 
 	std::cout << "目標へ移動開始" << std::endl;
 	std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
@@ -811,7 +811,7 @@ void VFH_navigation(float goal_x, float goal_y){
 		odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得
 		std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
 		std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
-		now2goal_dis = sqrt(pow(goal_x-odom_x,2)+pow(goal_y-odom_y,2));
+		now2goal_dis = sqrt(pow(goal_point_x-odom_x,2)+pow(goal_point_y-odom_y,2));
 	}
 	move_success = true;
 	std::cout << "目標へ移動終了" << std::endl;
@@ -963,6 +963,8 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 skip:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+	std::cout << "huhuhuhhhhhu" << std::endl;
+	
 	std::cout << "end  :far_frontier" << std::endl;
 }
 

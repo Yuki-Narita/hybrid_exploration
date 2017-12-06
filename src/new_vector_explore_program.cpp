@@ -65,7 +65,7 @@ float vfh_gra_y;
 float gra_angle;
 float gra_angle_r;
 
-bool first_cycle = true;
+bool first_cycle = false;//true;
 float scan_angle;//この角度の範囲内に空間があれば回転を終了する
 const float scan_branch_limit = 1.5;//分岐方向への回転をセンサデータから行うときにこの値以上だったら数値があっても良い
 bool scan_rotation_ok = false;//スキャンデータからの分岐回転を終了していいか
@@ -79,9 +79,9 @@ const float PI = 3.1415926;//円周率π
 const float forward_vel = 0.2;//前進速度[m/s]
 const float rotate_vel = 0.5;//回転速度[rad\s]
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
-const float forward_dis = 0.8;//一回のVFHで前方向に進む距離[m]
-const float scan_threshold = 0.8;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
-const float safe_space = 0.45;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
+const float forward_dis = 0.75;//一回のVFHで前方向に進む距離[m]
+const float scan_threshold = 1.2;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
+const float safe_space = 0.50;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
 
 bool move_success = false;
 
@@ -893,9 +893,9 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 		dot.push_back(dot_tmp);
 		length.push_back(dis_tmp);
 		i_list.push_back(i);
-			
+
 		point_num++;
-	
+
 		if(first_calc){
 			dot_max = std::abs(dot_tmp);
 			length_max = dis_tmp;
@@ -909,7 +909,6 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 		}
 	}
 
-skip:
 
 
 	first_calc = true;
@@ -939,6 +938,8 @@ skip:
 	
 	std::cout << "目標座標 (" << fro_x_tmp[goal_num] << "," << fro_y_tmp[goal_num] <<  ")" <<std::endl;
 
+
+
 	std::cout << "end  :制限範囲内にある座標に対して距離とベクトルの内積を計算し目標を決定" << std::endl;
 
 
@@ -958,6 +959,9 @@ skip:
 		pre_vector_x = odom_x - ro_x_map;
 		pre_vector_y = odom_y - ro_y_map;
 	}
+
+skip:
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 	std::cout << "end  :far_frontier" << std::endl;
 }
@@ -1287,11 +1291,17 @@ int main(int argc, char** argv){
 	scan_rotate_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,scan_rotate_callback,ros::VoidPtr(),&scan_rotate_queue);
 	scan_rotate_sub = f.subscribe(scan_rotate_option);
 
+	vel_pub = f.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1);
+	marker_pub = f.advertise<visualization_msgs::Marker>("visualization_marker", 1);
+
 
 	std::cout << "start:探査プログラム" << std::endl;
 
-	vel_pub = f.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1);
-	marker_pub = f.advertise<visualization_msgs::Marker>("visualization_marker", 1);
+//pre_vecorの計算をyaw使ってここでやる
+	odom_queue.callOne(ros::WallDuration(1));
+	pre_vector_x = cos(yaw);
+	pre_vector_y = sin(yaw);
+
 
 	while(!stop && ros::ok()){
 		map_queue.callOne(ros::WallDuration(1));

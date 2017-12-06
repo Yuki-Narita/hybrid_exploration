@@ -397,6 +397,7 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 			}
 			else{
 				branch_find_flag = true;
+				goal_x = goal_x - fix_sensor;
 				break;
 			}
 		}	

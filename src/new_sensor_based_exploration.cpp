@@ -7,6 +7,8 @@
 #include <visualization_msgs/Marker.h>
 #include <kobuki_msgs/BumperEvent.h>
 #include <geometry_msgs/Point.h>
+#include <kobuki_msgs/Led.h>
+
 
 /*パブリッシュ、サブスクライブ関連*/
 ros::CallbackQueue VFH_queue;
@@ -43,6 +45,7 @@ ros::Subscriber tf_sub;
 
 ros::Publisher vel_pub;
 ros::Publisher marker_pub;
+ros::Publisher led_pub;
 
 geometry_msgs::Twist vel;
 visualization_msgs::Marker marker3;
@@ -1247,6 +1250,17 @@ void VFH4vel_publish_Branch(){
 	float sum_diff = 0;
 	const float cancel_diff = 0; 
 
+	//ここでgoal_y情報からLEDを点灯
+	kobuki_msgs::Led led;
+
+	if(goal_y < 0){
+		led.value = 3;//分岐が左だと赤
+	}
+	else{
+		led.value = 2;//右だとオレンジ
+	}
+	led_pub.publish(led);
+
 	odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得	
 
 	goal_point_x = odom_x + cos(yaw)*goal_x - sin(yaw)*goal_y;
@@ -1300,6 +1314,9 @@ void VFH4vel_publish_Branch(){
 	}
 
 	std::cout << "目標へ移動終了" << std::endl;
+	led.value = 0;
+	led_pub.publish(led);//分岐に着いたらLED消灯
+
 	branch_find_flag = false;
 	display_gravity(odom_x, odom_y);
 }
@@ -1454,6 +1471,7 @@ int main(int argc, char** argv){
 	scan_rotate_sub = s.subscribe(scan_rotate_option);
 
 	vel_pub = s.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1);
+	led_pub = s.advertise<geometry_msgs::Twist>("/mobile_base/commands/led1", 1);
 	marker_pub = s.advertise<visualization_msgs::Marker>("visualization_marker", 1);
 
 	vel.linear.y = 0;

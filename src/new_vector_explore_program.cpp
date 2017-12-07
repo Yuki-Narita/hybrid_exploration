@@ -82,7 +82,7 @@ const float rotate_vel = 0.5;//回転速度[rad\s]
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
 const float forward_dis = 0.75;//一回のVFHで前方向に進む距離[m]
 const float scan_threshold = 1.2;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
-const float safe_space = 0.50;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
+const float safe_space = 0.6;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
 
 bool move_success = false;
 
@@ -620,8 +620,8 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 
 		odom_queue.callOne(ros::WallDuration(1));
 
-		x_g = scan_threshold * cos(ang_g) + odom_x;
-		y_g = scan_threshold * sin(ang_g) + odom_y;
+		x_g = (scan_threshold/2) * cos(ang_g) + odom_x;
+		y_g = (scan_threshold/2) * sin(ang_g) + odom_y;
 
 		display_goal_angle(x_g, y_g);	
 

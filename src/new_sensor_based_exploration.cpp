@@ -93,7 +93,7 @@ float pre_loop_y = 0;
 
 float pre_theta = 0;
 
-const float safe_space = 0.50;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
+const float safe_space = 0.6;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
 
 int which_bumper = 0;
 bool bumper_hit = false;
@@ -123,7 +123,7 @@ float scan_angle;//この角度の範囲内に空間があれば回転を終了�
 
 const float branch_angle = 0.04;//分岐領域を検出するのに必要な障害物がない空間の角度
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
-const int loop_closing_max = 5;//プログラムを切り替えるために必要なループクロージングの回数
+const int loop_closing_max = 10;//プログラムを切り替えるために必要なループクロージングの回数
 
 /*判別用フラグ*/
 bool AI_wakeup = false;//AIの起動演出をするかどうか
@@ -611,8 +611,8 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 
 		odom_queue.callOne(ros::WallDuration(1));
 
-		x_g = scan_threshold/2 * cos(ang_g) + odom_x;
-		y_g = scan_threshold/2 * sin(ang_g) + odom_y;
+		x_g = (scan_threshold/2) * cos(ang_g) + odom_x;
+		y_g = (scan_threshold/2) * sin(ang_g) + odom_y;
 
 		display_goal_angle(x_g, y_g);	
 	}
@@ -1039,8 +1039,8 @@ float VFH_move_angle_g(std::vector<float> &ranges, float angle_min, float angle_
 
 		odom_queue.callOne(ros::WallDuration(1));
 
-		x_g = scan_threshold/2 * cos(ang_g) + odom_x;
-		y_g = scan_threshold/2 * sin(ang_g) + odom_y;
+		x_g = (scan_threshold/2) * cos(ang_g) + odom_x;
+		y_g = (scan_threshold/2) * sin(ang_g) + odom_y;
 
 		display_goal_angle(x_g, y_g);	
 
@@ -1404,8 +1404,8 @@ void road_center_callback(const sensor_msgs::LaserScan::ConstPtr& road_msg){
 			ang_g = PI - over_rad;
 		}
 
-		x_g = scan_threshold/2 * cos(ang_g) + odom_x;
-		y_g = scan_threshold/2 * sin(ang_g) + odom_y;
+		x_g = (scan_threshold/2) * cos(ang_g) + odom_x;
+		y_g = (scan_threshold/2) * sin(ang_g) + odom_y;
 
 		display_goal_angle(x_g, y_g);
 
@@ -1524,8 +1524,8 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 			ang_g = PI - over_rad;
 		}
 
-		x_g = scan_threshold * cos(ang_g) + odom_x;
-		y_g = scan_threshold * sin(ang_g) + odom_y;
+		x_g = (scan_threshold/2) * cos(ang_g) + odom_x;
+		y_g = (scan_threshold/2) * sin(ang_g) + odom_y;
 
 		display_goal_angle(x_g, y_g);	
 

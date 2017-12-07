@@ -57,6 +57,7 @@ ros::Publisher which_pub;
 geometry_msgs::Twist vel;
 visualization_msgs::Marker marker3;
 
+
 /*グローバルで使う変数*/
 ros::Time set_time;//時間制限系while文の開始時間
 float goal_x;//分岐領域までの距離X(ロボットの前方向)
@@ -610,8 +611,8 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 
 		odom_queue.callOne(ros::WallDuration(1));
 
-		x_g = scan_threshold * cos(ang_g) + odom_x;
-		y_g = scan_threshold * sin(ang_g) + odom_y;
+		x_g = scan_threshold/2 * cos(ang_g) + odom_x;
+		y_g = scan_threshold/2 * sin(ang_g) + odom_y;
 
 		display_goal_angle(x_g, y_g);	
 	}
@@ -1038,8 +1039,8 @@ float VFH_move_angle_g(std::vector<float> &ranges, float angle_min, float angle_
 
 		odom_queue.callOne(ros::WallDuration(1));
 
-		x_g = scan_threshold * cos(ang_g) + odom_x;
-		y_g = scan_threshold * sin(ang_g) + odom_y;
+		x_g = scan_threshold/2 * cos(ang_g) + odom_x;
+		y_g = scan_threshold/2 * sin(ang_g) + odom_y;
 
 		display_goal_angle(x_g, y_g);	
 
@@ -1366,6 +1367,12 @@ void road_center_callback(const sensor_msgs::LaserScan::ConstPtr& road_msg){
 	std::vector<float> fixed_angle;
 	float goal_angle;
 
+	float x_g;
+	float y_g;
+	float ang_g;
+	float over_rad;
+
+
 	for(int i=0;i<ranges.size();i++){
 		if(!isnan(ranges[i])){
 			fixed_ranges.push_back(ranges[i]);
@@ -1384,6 +1391,24 @@ void road_center_callback(const sensor_msgs::LaserScan::ConstPtr& road_msg){
 	if(find_road_center){
 		//見つかったらgoal_angleをVFHに渡す
 		std::cout << "road_center:" << goal_angle << std::endl;
+
+		//目標角度をグローバルで
+		odom_queue.callOne(ros::WallDuration(1));
+		ang_g = yaw + goal_angle;
+		if(ang_g > PI){
+			over_rad = ang_g - PI;
+			ang_g = -PI + over_rad;
+		}
+		if(ang_g < -PI){
+			over_rad = ang_g + PI;
+			ang_g = PI - over_rad;
+		}
+
+		x_g = scan_threshold/2 * cos(ang_g) + odom_x;
+		y_g = scan_threshold/2 * sin(ang_g) + odom_y;
+
+		display_goal_angle(x_g, y_g);
+
 		vel_curve_VFH(goal_angle ,-angle_min);
 	}
 	else{
@@ -1570,11 +1595,11 @@ int main(int argc, char** argv){
 		branch_find_flag = false;
 		find_road_center = false;
 		tf_queue.callOne(ros::WallDuration(1));
+		std::cout << "loop_count : " << loop_count << std::endl;
 		if(loop_count == loop_closing_max){
 			std::cout << "ループクロージングを" << loop_closing_max << "回したので終了" << std::endl;
 			break;
 		}
-		std::cout << "loop_count : " << loop_count << std::endl;
 	}
 
 	return 0;

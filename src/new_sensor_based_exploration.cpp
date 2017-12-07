@@ -110,7 +110,7 @@ const float back_vel = -0.2;//VFHで全部nanだったときの後退速度[m/s]
 const float back_time = 0.5;//VFHで全部nanだったときに後退する時間[s]
 //分岐領域関連のパラメータ///
 const float Branch_threshold = 1.0;//1.0;//分岐領域の判断をする距離差の閾値[m]
-const float Branch_range_limit = 5.0;//分岐領域の判断を行う距離の最大値(分岐がこの値以上遠くにあっても認識しない)[m]
+const float Branch_range_limit = 10.0;//分岐領域の判断を行う距離の最大値(分岐がこの値以上遠くにあっても認識しない)[m]
 const float branch_obst_limit = 1.0;//スキャンデータの中心がこの値以下のとき分岐領域を検出しない[m]
 const float fix_sensor = 0.07;//分岐領域座標設定のときにセンサーから取れる距離の誤差を手前に補正(センサー値からマイナスする)[m]
 //重複探査関連のパラメータ///
@@ -1570,10 +1570,19 @@ int main(int argc, char** argv){
 	road_sub = s.subscribe(road_option);
 
 
+	
 	vel_pub = s.advertise<geometry_msgs::Twist>("/mobile_base/commands/velocity", 1);
 	led_pub = s.advertise<kobuki_msgs::Led>("/mobile_base/commands/led2", 1);
 	marker_pub = s.advertise<visualization_msgs::Marker>("visualization_marker", 1);
 	which_pub = s.advertise<geometry_msgs::Point>("/which_based", 1);
+
+
+	ros::Publisher led1_pub;
+	led1_pub = s.advertise<kobuki_msgs::Led>("/mobile_base/commands/led1", 1);
+	kobuki_msgs::Led led1;
+	led1.value = 2;//右だとオレンジ
+	led1_pub.publish(led1);
+
 
 	vel.linear.y = 0;
 	vel.linear.z = 0;

@@ -7,6 +7,8 @@
 #include <visualization_msgs/Marker.h>
 #include <kobuki_msgs/BumperEvent.h>
 #include <geometry_msgs/Point.h>
+#include <kobuki_msgs/Led.h>
+
 
 
 //グローバル変数////////////////////////////////////////////////////////////////////////////////////////////
@@ -515,6 +517,7 @@ float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_in
 		gra_angle_r = -2*PI + gra_angle_r;
 	}
 
+
 //gra_angle_rと角度が最も近くなるiの番号を調べる
 	for(i=0;i<angles.size();i++){
 		gra_angle_diff = std::abs(gra_angle_r - angles[i]);
@@ -746,6 +749,17 @@ void scan_rotate_callback(const sensor_msgs::LaserScan::ConstPtr& src_msg){
 }
 
 
+void reverse(){
+	float reverse_threshold = 0.87;
+	//yawとgra_angleの差が小さくなるまで回る
+	vel.angular.z = 0.5;
+	vel.linear.x = 0;
+	
+	while(ros::ok() && std::abs(gra_angle-yaw) < reverse_threshold){
+		vel_pub.publish(vel);
+	}	
+}
+
 void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の影響を受けた目標角度を決める
 	vfh_gra_x = goal_point_x - odom_x;
 	vfh_gra_y = goal_point_y - odom_y;
@@ -774,6 +788,13 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 	approx(ranges);
 
 	goal_angle = VFH_move_angle(ranges,angle_min,angle_increment,all_nan,gra_angle,angles);
+
+
+	//ここでgra_angle_rが±150度くらいになったら反転する処理を入れる
+	if(std::abs(gra_angle_r) >= 2.62){
+		reverse();//反転する関数
+		return;
+	}
 
 	bumper_queue.callOne(ros::WallDuration(1));
 
@@ -966,7 +987,6 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 skip:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-	std::cout << "huhuhuhhhhhu" << std::endl;
 	
 	std::cout << "end  :far_frontier" << std::endl;
 }
@@ -1307,12 +1327,20 @@ int main(int argc, char** argv){
 	pre_vector_x = cos(yaw);
 	pre_vector_y = sin(yaw);
 
-	
 
+	ros::Publisher led1_pub;
+	led1_pub = f.advertise<kobuki_msgs::Led>("/mobile_base/commands/led1", 1);
+	kobuki_msgs::Led led1;
+	led1.value = 3;
+	led1_pub.publish(led1);
 
 	while(!stop && ros::ok()){
 		map_queue.callOne(ros::WallDuration(1));
 	}
+	
+	led1.value = 0;
+	led1_pub.publish(led1);
+
 	std::cout << "end:探査プログラム" << std::endl;
 	return 0;
 }

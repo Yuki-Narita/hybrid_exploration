@@ -801,7 +801,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 void VFH_navigation(float goal_x, float goal_y){
 	goal_point_x = goal_x;
 	goal_point_y = goal_y;
-	const float goal_margin = 0.7;
+	const float goal_margin = 1.0;
 	float now2goal_dis = 100.0;
 
 	std::cout << "目標へ移動開始" << std::endl;

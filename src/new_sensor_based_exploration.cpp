@@ -123,7 +123,7 @@ float scan_angle;//この角度の範囲内に空間があれば回転を終了�
 
 const float branch_angle = 0.04;//分岐領域を検出するのに必要な障害物がない空間の角度
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
-const int loop_closing_max = 20;//プログラムを切り替えるために必要なループクロージングの回数
+const int loop_closing_max = 15;//プログラムを切り替えるために必要なループクロージングの回数
 
 /*判別用フラグ*/
 bool AI_wakeup = false;//AIの起動演出をするかどうか
@@ -401,7 +401,9 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 	}
 
 	if(branch_find_flag){
+		//std::cout << "size:" << branch_x_list.size() << std::endl;
 		for(int k=branch_x_list.size();k>0;k--){
+			//std::cout << "k:" << k << std::endl;
 			for(j=0;j<branch_x_list.size();j++){
 				temp_Branch_center_dist = std::abs(branch_x_list[j])+std::abs(branch_y_list[j]);
 				if(temp_Branch_center_dist <= Branch_center_dist){
@@ -412,11 +414,16 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 				}
 			}
 			if(duplicated_point_detection()){
-				branch_x_list.erase(branch_x_list.begin() + j);
-				branch_y_list.erase(branch_y_list.begin() + j);
+				//std::cout << "重複true" << std::endl;
+				branch_x_list.erase(branch_x_list.begin() + near);
+				//std::cout << "x.erase" << std::endl;
+				branch_y_list.erase(branch_y_list.begin() + near);
+				//std::cout << "y.erase" << std::endl;
 				branch_find_flag = false;
+				//std::cout << "flag" << std::endl;
 			}
 			else{
+				//std::cout << "重複false" << std::endl;
 				branch_find_flag = true;
 				goal_x = goal_x - fix_sensor;
 				break;
@@ -663,7 +670,7 @@ void vel_recovery(){
 		set_time = ros::Time::now();	
 	
 		while(ros::Time::now()-set_time < duration){
-			vel_pub.publish(vel);
+			//vel_pub.publish(vel);
 		}
 		need_back = false;
 	}
@@ -705,13 +712,13 @@ void vel_recovery(){
 		ros::Duration duration2(back_time+1.0);
 		set_time = ros::Time::now();
 		while(ros::Time::now()-set_time < duration2){
-			vel_pub.publish(vel);
+			//vel_pub.publish(vel);
 		}		
 	}
 	else{
 		while(!scan_rotation_ok && ros::ok()){
 			if(!scan_rotation_ok){
-				vel_pub.publish(vel);
+				//vel_pub.publish(vel);
 			}
 			scan_branch_queue.callOne(ros::WallDuration(1));//scan_angleに設定した角度の範に空間ができるまで回転する
 		}
@@ -742,7 +749,7 @@ void vel_curve_VFH_e(float rad_min ,float angle_max){
 	std::cout << vel.linear.x << "(v_debag)" << std::endl;
 	std::cout << vel.angular.z << "(o_debag)" << std::endl;
 
-	vel_pub.publish(vel);
+	//vel_pub.publish(vel);
 	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
 	odom_queue.callOne(ros::WallDuration(1));
@@ -776,7 +783,7 @@ void vel_curve_VFH_g(float rad_min ,float angle_max){
 	std::cout << vel.linear.x << "(v_debag)" << std::endl;
 	std::cout << vel.angular.z << "(o_debag)" << std::endl;
 
-	vel_pub.publish(vel);
+	//vel_pub.publish(vel);
 	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
 	odom_queue.callOne(ros::WallDuration(1));
@@ -810,7 +817,7 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	std::cout << vel.linear.x << "(v_debag)" << std::endl;
 	std::cout << vel.angular.z << "(o_debag)" << std::endl;
 
-	vel_pub.publish(vel);
+	//vel_pub.publish(vel);
 	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
 	odom_queue.callOne(ros::WallDuration(1));
@@ -1080,7 +1087,7 @@ void vel_recovery_g(){
 		set_time = ros::Time::now();	
 	
 		while(ros::Time::now()-set_time < duration){
-			vel_pub.publish(vel);
+			//vel_pub.publish(vel);
 		}
 		need_back = false;
 	}
@@ -1144,7 +1151,7 @@ void vel_recovery_g(){
 		ros::Duration duration2(back_time+1.0);
 		set_time = ros::Time::now();
 		while(ros::Time::now()-set_time < duration2){
-			vel_pub.publish(vel);
+			//vel_pub.publish(vel);
 		}		
 
 	}
@@ -1152,7 +1159,7 @@ void vel_recovery_g(){
 		while(!scan_rotation_ok && ros::ok()){
 			if(!scan_rotation_ok){
 				std::cout << "rotation_return(debag)なので速度送信" << std::endl;
-				vel_pub.publish(vel);
+				//vel_pub.publish(vel);
 			}
 		
 			scan_branch_queue.callOne(ros::WallDuration(1));//scan_angleに設定した角度の範に空間ができるまで回転する

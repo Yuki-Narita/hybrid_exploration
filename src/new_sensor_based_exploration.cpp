@@ -110,7 +110,7 @@ const float back_vel = -0.2;//VFHで全部nanだったときの後退速度[m/s]
 const float back_time = 0.5;//VFHで全部nanだったときに後退する時間[s]
 //分岐領域関連のパラメータ///
 const float Branch_threshold = 1.0;//1.0;//分岐領域の判断をする距離差の閾値[m]
-const float Branch_range_limit = 10.0;//分岐領域の判断を行う距離の最大値(分岐がこの値以上遠くにあっても認識しない)[m]
+const float Branch_range_limit = 5.0;//分岐領域の判断を行う距離の最大値(分岐がこの値以上遠くにあっても認識しない)[m]
 const float branch_obst_limit = 1.0;//スキャンデータの中心がこの値以下のとき分岐領域を検出しない[m]
 const float fix_sensor = 0.07;//分岐領域座標設定のときにセンサーから取れる距離の誤差を手前に補正(センサー値からマイナスする)[m]
 //重複探査関連のパラメータ///
@@ -123,7 +123,7 @@ float scan_angle;//この角度の範囲内に空間があれば回転を終了�
 
 const float branch_angle = 0.04;//分岐領域を検出するのに必要な障害物がない空間の角度
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
-const int loop_closing_max = 10;//プログラムを切り替えるために必要なループクロージングの回数
+const int loop_closing_max = 20;//プログラムを切り替えるために必要なループクロージングの回数
 
 /*判別用フラグ*/
 bool AI_wakeup = false;//AIの起動演出をするかどうか
@@ -1581,6 +1581,9 @@ int main(int argc, char** argv){
 	led1_pub = s.advertise<kobuki_msgs::Led>("/mobile_base/commands/led1", 1);
 	kobuki_msgs::Led led1;
 	led1.value = 2;//右だとオレンジ
+
+	sleep(1);
+
 	led1_pub.publish(led1);
 
 

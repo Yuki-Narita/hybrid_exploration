@@ -405,7 +405,7 @@ void vel_recovery(){
 			vel.angular.z = rotate_vel;
 		}	
 	
-		ros::Duration duration2(back_time+3.0);
+		ros::Duration duration2(back_time+1.0);
 		set_time = ros::Time::now();
 		while(ros::Time::now()-set_time < duration2){
 			vel_pub.publish(vel);
@@ -1332,6 +1332,9 @@ int main(int argc, char** argv){
 	led1_pub = f.advertise<kobuki_msgs::Led>("/mobile_base/commands/led1", 1);
 	kobuki_msgs::Led led1;
 	led1.value = 3;
+	
+	sleep(1);
+	
 	led1_pub.publish(led1);
 
 	while(!stop && ros::ok()){

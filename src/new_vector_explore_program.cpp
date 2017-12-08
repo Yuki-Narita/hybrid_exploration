@@ -755,7 +755,7 @@ void reverse(){
 	vel.angular.z = 0.5;
 	vel.linear.x = 0;
 	
-	while(ros::ok() && std::abs(gra_angle-yaw) < reverse_threshold){
+	while(ros::ok() && std::abs(gra_angle-yaw) > reverse_threshold){
 		vel_pub.publish(vel);
 	}	
 }

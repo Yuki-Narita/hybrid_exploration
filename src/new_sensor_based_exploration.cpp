@@ -670,7 +670,7 @@ void vel_recovery(){
 		set_time = ros::Time::now();	
 	
 		while(ros::Time::now()-set_time < duration){
-			//vel_pub.publish(vel);
+			vel_pub.publish(vel);
 		}
 		need_back = false;
 	}
@@ -712,13 +712,13 @@ void vel_recovery(){
 		ros::Duration duration2(back_time+1.0);
 		set_time = ros::Time::now();
 		while(ros::Time::now()-set_time < duration2){
-			//vel_pub.publish(vel);
+			vel_pub.publish(vel);
 		}		
 	}
 	else{
 		while(!scan_rotation_ok && ros::ok()){
 			if(!scan_rotation_ok){
-				//vel_pub.publish(vel);
+				vel_pub.publish(vel);
 			}
 			scan_branch_queue.callOne(ros::WallDuration(1));//scan_angleに設定した角度の範に空間ができるまで回転する
 		}
@@ -749,7 +749,7 @@ void vel_curve_VFH_e(float rad_min ,float angle_max){
 	std::cout << vel.linear.x << "(v_debag)" << std::endl;
 	std::cout << vel.angular.z << "(o_debag)" << std::endl;
 
-	//vel_pub.publish(vel);
+	vel_pub.publish(vel);
 	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
 	odom_queue.callOne(ros::WallDuration(1));
@@ -783,7 +783,7 @@ void vel_curve_VFH_g(float rad_min ,float angle_max){
 	std::cout << vel.linear.x << "(v_debag)" << std::endl;
 	std::cout << vel.angular.z << "(o_debag)" << std::endl;
 
-	//vel_pub.publish(vel);
+	vel_pub.publish(vel);
 	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
 	odom_queue.callOne(ros::WallDuration(1));
@@ -817,7 +817,7 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	std::cout << vel.linear.x << "(v_debag)" << std::endl;
 	std::cout << vel.angular.z << "(o_debag)" << std::endl;
 
-	//vel_pub.publish(vel);
+	vel_pub.publish(vel);
 	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
 	odom_queue.callOne(ros::WallDuration(1));
@@ -1087,7 +1087,7 @@ void vel_recovery_g(){
 		set_time = ros::Time::now();	
 	
 		while(ros::Time::now()-set_time < duration){
-			//vel_pub.publish(vel);
+			vel_pub.publish(vel);
 		}
 		need_back = false;
 	}
@@ -1151,7 +1151,7 @@ void vel_recovery_g(){
 		ros::Duration duration2(back_time+1.0);
 		set_time = ros::Time::now();
 		while(ros::Time::now()-set_time < duration2){
-			//vel_pub.publish(vel);
+			vel_pub.publish(vel);
 		}		
 
 	}
@@ -1159,7 +1159,7 @@ void vel_recovery_g(){
 		while(!scan_rotation_ok && ros::ok()){
 			if(!scan_rotation_ok){
 				std::cout << "rotation_return(debag)なので速度送信" << std::endl;
-				//vel_pub.publish(vel);
+				vel_pub.publish(vel);
 			}
 		
 			scan_branch_queue.callOne(ros::WallDuration(1));//scan_angleに設定した角度の範に空間ができるまで回転する

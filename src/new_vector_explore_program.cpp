@@ -706,6 +706,7 @@ void scan_rotate_callback(const sensor_msgs::LaserScan::ConstPtr& src_msg){
 	float plus_ave;
 	float minus_ave;
 	float sum = 0;
+	float range_threshold = 1.0;
 
 	std::vector<float> ranges = src_msg->ranges;
 
@@ -734,17 +735,22 @@ void scan_rotate_callback(const sensor_msgs::LaserScan::ConstPtr& src_msg){
 	std::cout << "plus_ave:" << plus_ave << std::endl;
 	std::cout << "minus_ave:" << minus_ave << std::endl;
 
-	if(plus_ave > minus_ave){
-		std::cout << "plusに回転\n" << std::endl;
-		Emergency_avoidance = 1.0;
-	}
-	else if(plus_ave < minus_ave){
-		std::cout << "minusに回転\n" << std::endl;
-		Emergency_avoidance = -1.0;
+	if(plus_ave < range_threshold && minus_ave < range_threshold){
+		return;
 	}
 	else{
-		std::cout << "無理です\n" << std::endl;	
-		undecided_rotate = true;
+		if(plus_ave > minus_ave){
+			std::cout << "plusに回転\n" << std::endl;
+			Emergency_avoidance = 1.0;
+		}
+		else if(plus_ave < minus_ave){
+			std::cout << "minusに回転\n" << std::endl;
+			Emergency_avoidance = -1.0;
+		}
+		else{
+			std::cout << "無理です\n" << std::endl;	
+			undecided_rotate = true;
+		}
 	}
 }
 

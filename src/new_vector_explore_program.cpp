@@ -789,6 +789,7 @@ void reverse(){
 	
 	while(ros::ok() && std::abs(gra_angle-yaw) > reverse_threshold){
 		vel_pub.publish(vel);
+		odom_queue.callOne(ros::WallDuration(1));
 	}	
 }
 

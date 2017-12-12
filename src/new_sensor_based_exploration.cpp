@@ -727,7 +727,7 @@ void vel_recovery(){
 	}
 }
 
-
+/*
 void vel_curve_VFH_e(float rad_min ,float angle_max){
 	const float theta = rad_min;
 	const float v = forward_vel;
@@ -760,7 +760,6 @@ void vel_curve_VFH_e(float rad_min ,float angle_max){
 	odom_marking(odom_x,odom_y);
 
 }
-
 
 void vel_curve_VFH_g(float rad_min ,float angle_max){
 	const float theta = rad_min;
@@ -795,7 +794,6 @@ void vel_curve_VFH_g(float rad_min ,float angle_max){
 
 }
 
-
 void vel_curve_VFH(float rad_min ,float angle_max){
 	const float theta = rad_min;
 	const float v = forward_vel;
@@ -828,7 +826,30 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	odom_marking(odom_x,odom_y);
 
 }
+*/
+//速度などを引数で使えるようにした速度送信関数
+void vel_curve_VFH2(float theta,float v,float t){
+	float theta_rho;
+	float omega;
 
+	pre_theta = theta;
+
+	theta_rho = 2*theta;
+	omega = theta_rho/t;
+
+	vel.linear.x = v;
+	vel.angular.z = omega;
+
+	vel_pub.publish(vel);
+	std::cout << "障害物を回避しながら移動中♪" << std::endl;
+
+	odom_queue.callOne(ros::WallDuration(1));
+
+	odom_log_x.push_back(odom_x);
+	odom_log_y.push_back(odom_y);
+	
+	odom_marking(odom_x,odom_y);
+}
 
 void approx(std::vector<float> &scan){
 	float depth,depth1,depth2;
@@ -1174,6 +1195,7 @@ void scan_rotate_callback(const sensor_msgs::LaserScan::ConstPtr& src_msg){
 	float minus_ave;
 	float sum = 0;
 	float range_threshold = 1.0;
+	const float angle_max = src_msg->angle_max;
 
 	std::vector<float> ranges = src_msg->ranges;
 
@@ -1204,16 +1226,18 @@ void scan_rotate_callback(const sensor_msgs::LaserScan::ConstPtr& src_msg){
 
 
 	if(plus_ave < range_threshold && minus_ave < range_threshold){
-		return;
+		vel_curve_VFH2(Emergency_avoidance*angle_max/6,0.0,0.3);
 	}
 	else{
 		if(plus_ave > minus_ave){
 			std::cout << "plusに回転\n" << std::endl;
 			Emergency_avoidance = 1.0;
+			vel_curve_VFH2(Emergency_avoidance*angle_max/6,forward_vel,0.3);
 		}
 		else if(plus_ave < minus_ave){
 			std::cout << "minusに回転\n" << std::endl;
 			Emergency_avoidance = -1.0;
+			vel_curve_VFH2(Emergency_avoidance*angle_max/6,forward_vel,0.3);
 		}
 		else{
 			std::cout << "無理です\n" << std::endl;	
@@ -1261,15 +1285,16 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 			vel_recovery_g();
 			undecided_rotate = false;
 		}
-		else{
+		//else{
 			//vel_curve_VFH(Emergency_avoidance*angle_max/6,angle_max);
-			vel_curve_VFH_e(Emergency_avoidance*angle_max/6,angle_max);
-		}
+			//vel_curve_VFH_e(Emergency_avoidance*angle_max/6,angle_max);
+		//}
 	}
 	else{
 		need_back = true;
 		need_rotate_calc = true;
-		vel_curve_VFH_g(goal_angle_v, angle_max);	
+		//vel_curve_VFH_g(goal_angle_v, angle_max);
+		vel_curve_VFH2(goal_angle_v,forward_vel,1.0);	
 	}
 }
 
@@ -1425,7 +1450,8 @@ void road_center_callback(const sensor_msgs::LaserScan::ConstPtr& road_msg){
 
 		display_goal_angle(x_g, y_g);
 
-		vel_curve_VFH(goal_angle ,-angle_min);
+		//vel_curve_VFH(goal_angle ,-angle_min);
+		vel_curve_VFH2(goal_angle,forward_vel,0.8);
 	}
 	else{
 		std::cout << "not_road_center" << std::endl;
@@ -1519,10 +1545,10 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 			vel_recovery();
 			undecided_rotate = false;
 		}
-		else{
+		//else{
 			//vel_curve_VFH(-Emergency_avoidance*angle_min/6,-angle_min);
-			vel_curve_VFH_e(-Emergency_avoidance*angle_min/6,-angle_min);
-		}
+			//vel_curve_VFH_e(-Emergency_avoidance*angle_min/6,-angle_min);
+		//}
 	}
 	else{
 		need_back = true;
@@ -1545,7 +1571,8 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 
 		display_goal_angle(x_g, y_g);	
 
-		vel_curve_VFH(m_angle,-angle_min);	
+		//vel_curve_VFH(m_angle,-angle_min);
+		vel_curve_VFH2(m_angle,forward_vel,0.5);
 	}
 }
 

@@ -427,7 +427,7 @@ void vel_recovery(){
 		scan_rotation_ok = false;
 	}
 }
-
+/*
 void vel_curve_VFH_e(float rad_min ,float angle_max){
 	const float theta = rad_min;
 	const float v = forward_vel;
@@ -481,6 +481,27 @@ void vel_curve_VFH(float rad_min ,float angle_max){
 	vel_pub.publish(vel);
 	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
+
+	odom_queue.callOne(ros::WallDuration(1));
+	odom_marking(odom_x,odom_y);
+}
+*/
+
+//速度などを引数で使えるようにした速度送信関数
+void vel_curve_VFH2(float theta,float v,float t){
+	float theta_rho;
+	float omega;
+
+	pre_theta = theta;
+
+	theta_rho = 2*theta;
+	omega = theta_rho/t;
+
+	vel.linear.x = v;
+	vel.angular.z = omega;
+
+	vel_pub.publish(vel);
+	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
 	odom_queue.callOne(ros::WallDuration(1));
 	odom_marking(odom_x,odom_y);
@@ -709,6 +730,7 @@ void scan_rotate_callback(const sensor_msgs::LaserScan::ConstPtr& src_msg){
 	float minus_ave;
 	float sum = 0;
 	float range_threshold = 1.0;
+	const float angle_max = src_msg->angle_max;
 
 	std::vector<float> ranges = src_msg->ranges;
 
@@ -738,16 +760,18 @@ void scan_rotate_callback(const sensor_msgs::LaserScan::ConstPtr& src_msg){
 	std::cout << "minus_ave:" << minus_ave << std::endl;
 
 	if(plus_ave < range_threshold && minus_ave < range_threshold){
-		return;
+		vel_curve_VFH2(Emergency_avoidance*angle_max/6,0.0,0.3);
 	}
 	else{
 		if(plus_ave > minus_ave){
 			std::cout << "plusに回転\n" << std::endl;
 			Emergency_avoidance = 1.0;
+			vel_curve_VFH2(Emergency_avoidance*angle_max/6,forward_vel,0.3);
 		}
 		else if(plus_ave < minus_ave){
 			std::cout << "minusに回転\n" << std::endl;
 			Emergency_avoidance = -1.0;
+			vel_curve_VFH2(Emergency_avoidance*angle_max/6,forward_vel,0.3);
 		}
 		else{
 			std::cout << "無理です\n" << std::endl;	
@@ -819,14 +843,15 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 			vel_recovery();
 			undecided_rotate = false;
 		}
-		else{
+		/*else{
 			vel_curve_VFH_e(Emergency_avoidance*angle_max/6,angle_max);
-		}
+		}*/
 	}
 	else{
 		need_back = true;
 		need_rotate_calc = true;
-		vel_curve_VFH(goal_angle, angle_max);	
+		//vel_curve_VFH(goal_angle, angle_max);
+		vel_curve_VFH2(goal_angle,forward_vel,1.0);		
 	}
 }
 

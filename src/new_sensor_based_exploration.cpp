@@ -125,6 +125,8 @@ const float branch_angle = 0.04;//分岐領域を検出するのに必要な障�
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
 const int loop_closing_max = 15;//プログラムを切り替えるために必要なループクロージングの回数
 
+float sum_trans = 0;
+
 /*判別用フラグ*/
 bool AI_wakeup = false;//AIの起動演出をするかどうか
 bool branch_find_flag = false;//分岐領域があるかどうか
@@ -252,14 +254,19 @@ void export_data(float i, float range){
 void tf_callback(const geometry_msgs::Point::ConstPtr& tf_data){
 	float trans_x = tf_data -> x;
 	float trans_y = tf_data -> y;
+	float trans_threshold = 0.2;
 
 	std::cout << "x:" << trans_x << "," << "y:" << trans_y << std::endl;
 	
 	if(trans_x != pre_loop_x || trans_y != pre_loop_y){
+		sum_trans += sqrt(pow(trans_x-pre_loop_x,2)+pow(trans_y-pre_loop_y,2));
+		if(sum_trans > trans_threshold){
+			loop_count++;
+			std::cout << "ループクロージング" << loop_count << "回目" << std::endl;
+			sum_trans = 0;
+		}
 		pre_loop_x = trans_x;
 		pre_loop_y = trans_y;
-		loop_count++;
-		std::cout << "ループクロージング" << loop_count << "回目" << std::endl;
 	}
 }
 

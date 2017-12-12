@@ -90,6 +90,8 @@ bool move_success = false;
 
 bool bumper_hit = false;
 int which_bumper = 0;
+bool first_move = false;
+bool reverse_flag = false;
 
 //引力を考慮した回転方向が決まったらこの関数を使う//地図情報に基づいて回転方向を決定//引力方向に回ると反転しそうだったら//両側にあったら引力
 void rotation_based_map(const nav_msgs::OccupancyGrid::ConstPtr& map_msg){
@@ -795,13 +797,16 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 
 	goal_angle = VFH_move_angle(ranges,angle_min,angle_increment,all_nan,gra_angle,angles);
 
-
+	//目標を設定した一回目だけ行う
+	if(first_move){
+		first_move = false;
 	//ここでgra_angle_rが±150度くらいになったら反転する処理を入れる
-	if(std::abs(gra_angle_r) >= 2.62){
-		reverse();//反転する関数
-		return;
+		if(std::abs(gra_angle_r) >= 2.62){
+			reverse();//反転する関数
+			reverse_flag = true;
+			return;
+		}
 	}
-
 	bumper_queue.callOne(ros::WallDuration(1));
 
 
@@ -828,20 +833,45 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 void VFH_navigation(float goal_x, float goal_y){
 	goal_point_x = goal_x;
 	goal_point_y = goal_y;
-	const float goal_margin = 1.0;
+	const float goal_margin = 0.7;
 	float now2goal_dis = 100.0;
+	float pre_now2goal_dis;
+	float sum_diff = 0;
+	const float cancel_diff = 0; 
 
 	std::cout << "目標へ移動開始" << std::endl;
 	std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
 	odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得
 	std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
+
+	first_move = true;
+
+	now2goal_dis = sqrt(pow(goal_point_x-odom_x,2)+pow(goal_point_y-odom_y,2));
 	
 	while(now2goal_dis > goal_margin && ros::ok()){
 		scan_queue.callOne(ros::WallDuration(1));//重力の影響を受けた進行方向を決めて速度を送る
+		if(reverse_flag){
+			odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得
+			scan_queue.callOne(ros::WallDuration(1));
+			reverse_flag = false;
+		}
 		odom_queue.callOne(ros::WallDuration(1));//自分のオドメトリ取得
 		std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
 		std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
+		pre_now2goal_dis = now2goal_dis;
 		now2goal_dis = sqrt(pow(goal_point_x-odom_x,2)+pow(goal_point_y-odom_y,2));
+		if(pre_now2goal_dis - now2goal_dis < 0){
+			sum_diff += pre_now2goal_dis - now2goal_dis;
+			if(sum_diff < cancel_diff){
+				std::cout << "距離が遠くなったためbreak" << std::endl;
+				move_success = false;
+				std::cout << "目標への移動不可" << std::endl;
+				return;
+			}
+		}
+		else{
+			sum_diff = 0;
+		}
 	}
 	move_success = true;
 	std::cout << "目標へ移動終了" << std::endl;

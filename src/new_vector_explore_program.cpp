@@ -1069,15 +1069,39 @@ void frontier_search(const nav_msgs::OccupancyGrid::ConstPtr& msg){
 
 //地図データを配列に格納////////////////////////////////////////////////////////////////////////////////////////
 	const nav_msgs::MapMetaData info = msg->info;//地図の設定を取得
-	const std::vector<int8_t> data = msg->data;//地図の値を取得
+	//const std::vector<int8_t> data = msg->data;//地図の値を取得
 	const int x = info.width;//地図の横サイズ
 	const int y = info.height;//地図の縦サイズ
 	int fro_num;
 	std::vector<float> fro_x;//見つけたフロンティアのx座標
-	std::vector<float> fro_y;//見つけたフロンティアのy座標	
-	int8_t map_array[x][y];//地図を行列に格納
-	int frontier_flag[x][y];//探査済みと未探査の境界を判定するフラグ
-	int point[x][y];//未探査領域の近くに障害物があるか判定する用
+	std::vector<float> fro_y;//見つけたフロンティアのy座標
+
+	//newでメモリを確保する
+
+	//配列new用ポインタの宣言
+        int8_t **map_array;
+        int **point;
+        int **frontier_flag;
+
+        //int8_t map_array[x][y];//地図を行列に格納
+        map_array = new int8_t*[x];
+        for(int p=0;p<x;p++){
+                map_array[p] = new int8_t[y];
+        }
+
+        //int frontier_flag[x][y];//探査済みと未探査の境界を判定するフラグ
+        frontier_flag = new int*[x];
+        for(int p=0;p<x;p++){
+                frontier_flag[p] = new int[y];
+        }
+
+        //int point[x][y];//未探査領域の近くに障害物があるか判定する用
+        point = new int*[x];
+        for(int p=0;p<x;p++){
+                point[p] = new int[y];
+        }
+
+
 	int i,j;//for文
 	int k = 0;//for文
 
@@ -1088,7 +1112,7 @@ void frontier_search(const nav_msgs::OccupancyGrid::ConstPtr& msg){
 
 	for(i=0;i<y;i++){
     		for(j=0;j<x;j++){
-      			map_array[j][i] = data[k];
+      			map_array[j][i] = msg->data[k];
 			if(map_array[j][i]!=0 && map_array[j][i]!=100 && map_array[j][i]!=-1){
 					std::cout << "exception:" << map_array[j][i] << std::endl;		
 			}
@@ -1354,6 +1378,22 @@ void frontier_search(const nav_msgs::OccupancyGrid::ConstPtr& msg){
 	}
 
 	choose_goal_frontier(fro_x, fro_y, fro_num);
+
+	//newで確保したメモリを開放する
+	for(int p=0;p<x;p++){
+                delete[] map_array[p];
+        }
+        delete[] map_array;
+
+        for(int p=0;p<x;p++){
+                delete[] point[p];
+        }
+        delete[] point;
+
+        for(int p=0;p<x;p++){
+                delete[] frontier_flag[p];
+        }
+        delete[] frontier_flag;
 
 	std::cout << "end  :frontier_search" << std::endl;
 }

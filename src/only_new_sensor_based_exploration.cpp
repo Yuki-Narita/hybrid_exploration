@@ -114,7 +114,7 @@ const float Branch_range_limit = 5.0;//分岐領域の判断を行う距離の�
 const float branch_obst_limit = 1.0;//スキャンデータの中心がこの値以下のとき分岐領域を検出しない[m]
 const float fix_sensor = 0.07;//分岐領域座標設定のときにセンサーから取れる距離の誤差を手前に補正(センサー値からマイナスする)[m]
 //重複探査関連のパラメータ///
-const float duplication_margin = 1.0;//重複探査の判断をするときの半径[m]←正方形の辺の半分の長さでした
+const float duplication_margin = 1.5;//重複探査の判断をするときの半径[m]←正方形の辺の半分の長さでした
 
 const float scan_branch_limit = 1.5;//分岐方向への回転をセンサデータから行うときにこの値以上だったら数値があっても良い
 const float branch_y_threshold = 4.0;//分岐領域の2点間のｙ座標の差がこの値以下のとき分岐として検出

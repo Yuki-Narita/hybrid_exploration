@@ -1585,7 +1585,7 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 
 
 int main(int argc, char** argv){
-	ros::init(argc, argv, "new_sensor_based_exploration");
+	ros::init(argc, argv, "only_new_sensor_based_exploration");
 	ros::NodeHandle s;
 
 	VFH_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,VFH_scan_callback,ros::VoidPtr(),&VFH_queue);
@@ -1658,10 +1658,10 @@ int main(int argc, char** argv){
 		find_road_center = false;
 		tf_queue.callOne(ros::WallDuration(1));
 		std::cout << "loop_count : " << loop_count << std::endl;
-		if(loop_count == loop_closing_max){
+		/*if(loop_count == loop_closing_max){
 			std::cout << "ループクロージングを" << loop_closing_max << "回したので終了" << std::endl;
 			break;
-		}
+		}*/
 	}
 
 	return 0;

@@ -1036,15 +1036,26 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 	VFH_navigation(fro_x_tmp[goal_num], fro_y_tmp[goal_num]);
 
 	if(move_success){
-		pre_vector_x = fro_x_tmp[goal_num] - ro_x_map;
-		pre_vector_y = fro_y_tmp[goal_num] - ro_y_map;
+		//pre_vector_x = fro_x_tmp[goal_num] - ro_x_map;
+		//pre_vector_y = fro_y_tmp[goal_num] - ro_y_map;
+
+		//odom_queue.callOne(ros::WallDuration(1));
+		//pre_vector_x = cos(yaw);
+		//pre_vector_y = sin(yaw);
+
 		move_success = false;
 	}
-	else{
-		odom_queue.callOne(ros::WallDuration(1));
-		pre_vector_x = odom_x - ro_x_map;
-		pre_vector_y = odom_y - ro_y_map;
-	}
+	/*else{
+		//odom_queue.callOne(ros::WallDuration(1));
+		//pre_vector_x = odom_x - ro_x_map;
+		//pre_vector_y = odom_y - ro_y_map;
+		//pre_vector_x = cos(yaw);
+		//pre_vector_y = sin(yaw);
+	}*/
+
+	odom_queue.callOne(ros::WallDuration(1));
+	pre_vector_x = cos(yaw);
+	pre_vector_y = sin(yaw);
 
 skip:
 

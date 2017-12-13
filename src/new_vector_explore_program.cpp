@@ -86,8 +86,6 @@ const float forward_dis = 0.75;//一回のVFHで前方向に進む距離[m]
 const float scan_threshold = 1.2;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
 const float safe_space = 0.6;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
 
-bool move_success = false;
-
 bool bumper_hit = false;
 int which_bumper = 0;
 bool first_move = false;
@@ -102,6 +100,7 @@ void rotation_based_map(const nav_msgs::OccupancyGrid::ConstPtr& map_msg){
 	const float m_per_cell = info.resolution;
 	const float low_left_x = info.origin.position.x;//地図の左下のx座標
 	const float low_left_y = info.origin.position.y;//地図の左下のy座標
+	//ここでもnewで確保したほうがいいかも
 	int8_t map_array[x][y];//地図を行列に格納
 	int i;
 	int j;
@@ -188,28 +187,10 @@ void rotation_based_map(const nav_msgs::OccupancyGrid::ConstPtr& map_msg){
 }
 
 void odom_marking(float x, float y){
-
-//	uint32_t list = visualization_msgs::Marker::LINE_STRIP;
 	geometry_msgs::Point marking;
-/*
-	marker3.header.frame_id = "map";
-	marker3.header.stamp = ros::Time::now();
-	marker3.ns = "basic_shapes";
-	marker3.id = 2;
-	marker3.type = list;
-	marker3.action = visualization_msgs::Marker::ADD;
-	marker3.lifetime = ros::Duration(0);
-	marker3.pose.orientation.w = 1.0;
-	marker3.scale.x = 0.1;
-	marker3.color.b = 1.0f;
-	marker3.color.a = 1.0;
-	marker3.color.r = 0.0f;
-	marker3.color.g = 0.0f;
-*/
 	marking.x = x;
 	marking.y = y;
 	marking.z = 1.0;
-	//marker3.points.push_back(marking);
 	which_pub.publish(marking);
 }
 
@@ -427,65 +408,6 @@ void vel_recovery(){
 		scan_rotation_ok = false;
 	}
 }
-/*
-void vel_curve_VFH_e(float rad_min ,float angle_max){
-	const float theta = rad_min;
-	const float v = forward_vel;
-
-	float theta_rho;
-	float omega;
-	float t = 0.2;
-
-	pre_theta = theta;
-
-	theta_rho = 2*theta;
-	omega = theta_rho/t;
-
-	vel.linear.x = v;
-	vel.angular.z = omega;
-
-	std::cout << theta << "(theta_debag)" << std::endl;
-	std::cout << t << "(t_debag)" << std::endl;
-	std::cout << vel.linear.x << "(v_debag)" << std::endl;
-	std::cout << vel.angular.z << "(o_debag)" << std::endl;
-
-	vel_pub.publish(vel);
-	std::cout << "障害物を回避しながら移動中♪" << std::endl;
-
-	odom_queue.callOne(ros::WallDuration(1));
-	odom_marking(odom_x,odom_y);
-}
-
-
-void vel_curve_VFH(float rad_min ,float angle_max){
-	const float theta = rad_min;
-	const float v = forward_vel;
-
-	float theta_rho;
-	float omega;
-	float t = 1.0;
-
-	pre_theta = theta;
-
-	theta_rho = 2*theta;
-	omega = theta_rho/t;
-
-	vel.linear.x = v;
-	vel.angular.z = omega;
-
-	std::cout << theta << "(theta_debag)" << std::endl;
-	std::cout << t << "(t_debag)" << std::endl;
-	std::cout << vel.linear.x << "(v_debag)" << std::endl;
-	std::cout << vel.angular.z << "(o_debag)" << std::endl;
-
-	vel_pub.publish(vel);
-	std::cout << "障害物を回避しながら移動中♪" << std::endl;
-
-
-	odom_queue.callOne(ros::WallDuration(1));
-	odom_marking(odom_x,odom_y);
-}
-*/
 
 //速度などを引数で使えるようにした速度送信関数
 void vel_curve_VFH2(float theta,float v,float t){
@@ -890,7 +812,6 @@ void VFH_navigation(float goal_x, float goal_y){
 			sum_diff += pre_now2goal_dis - now2goal_dis;
 			if(sum_diff < cancel_diff){
 				std::cout << "距離が遠くなったためbreak" << std::endl;
-				move_success = false;
 				std::cout << "目標への移動不可" << std::endl;
 				return;
 			}
@@ -899,7 +820,6 @@ void VFH_navigation(float goal_x, float goal_y){
 			sum_diff = 0;
 		}
 	}
-	move_success = true;
 	std::cout << "目標へ移動終了" << std::endl;
 }
 
@@ -1034,24 +954,6 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 
 ////////////////////////*******//ここで経路作成関数に目標を渡す///******////////////////////////////////
 	VFH_navigation(fro_x_tmp[goal_num], fro_y_tmp[goal_num]);
-
-	if(move_success){
-		//pre_vector_x = fro_x_tmp[goal_num] - ro_x_map;
-		//pre_vector_y = fro_y_tmp[goal_num] - ro_y_map;
-
-		//odom_queue.callOne(ros::WallDuration(1));
-		//pre_vector_x = cos(yaw);
-		//pre_vector_y = sin(yaw);
-
-		move_success = false;
-	}
-	/*else{
-		//odom_queue.callOne(ros::WallDuration(1));
-		//pre_vector_x = odom_x - ro_x_map;
-		//pre_vector_y = odom_y - ro_y_map;
-		//pre_vector_x = cos(yaw);
-		//pre_vector_y = sin(yaw);
-	}*/
 
 	odom_queue.callOne(ros::WallDuration(1));
 	pre_vector_x = cos(yaw);

@@ -123,7 +123,7 @@ float scan_angle;//この角度の範囲内に空間があれば回転を終了�
 
 const float branch_angle = 0.04;//分岐領域を検出するのに必要な障害物がない空間の角度
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
-const int loop_closing_max = 5;//プログラムを切り替えるために必要なループクロージングの回数
+const int loop_closing_max = 10;//プログラムを切り替えるために必要なループクロージングの回数
 
 float sum_trans = 0;
 
@@ -136,35 +136,11 @@ bool scan_rotation_ok = false;//スキャンデータからの分岐回転を終
 bool find_road_center = false;
 
 void odom_marking(float x, float y){
-	//uint32_t list = visualization_msgs::Marker::LINE_STRIP;
 	geometry_msgs::Point marking_point;
-	/*std_msgs::ColorRGBA marking_color;
-	marker3.header.frame_id = "map";
-	marker3.header.stamp = ros::Time::now();
-	marker3.ns = "basic_shapes";
-	marker3.id = 2;
-	marker3.type = list;
-	marker3.action = visualization_msgs::Marker::ADD;
-	marker3.lifetime = ros::Duration(0);
-	marker3.pose.orientation.w = 1.0;
-	marker3.scale.x = 0.1;
 
-	marker3.color.b = 0.0f;
-	marker3.color.a = 1.0;
-	marker3.color.r = 1.0f;
-	marker3.color.g = 1.0f;
-
-	marking_color.b = 0.0f;
-	marking_color.a = 1.0;
-	marking_color.r = 1.0f;
-	marking_color.g = 1.0f;
-*/
 	marking_point.x = x;
 	marking_point.y = y;
 	marking_point.z = 0.0;
-
-//	marker3.points.push_back(marking_point);
-//	marker3.colors.push_back(marking_color);
 
 	which_pub.publish(marking_point);
 }
@@ -269,27 +245,6 @@ void tf_callback(const geometry_msgs::Point::ConstPtr& tf_data){
 		pre_loop_y = trans_y;
 	}
 }
-
-/*
-void tf_callback(const tf2_msgs::TFMessage::ConstPtr& tf_data){
-	float trans_x = tf_data -> transforms[0].transform.translation.x;
-	float trans_y = tf_data -> transforms[0].transform.translation.y;
-	std::basic_string<char> child_frame_id = tf_data -> transforms[0].child_frame_id;
-	std::basic_string<char> frame_id = tf_data -> transforms[0].header.frame_id;
-
-
-	if(frame_id == "map"){
-		std::cout << "x:" << trans_x << "," << "y:" << trans_y << std::endl;
-		//std::cout << "child_frame_id : " << child_frame_id << std::endl;
-		//std::cout << "frame_id : " << frame_id  << "\n" << std::endl;
-		if(trans_x != pre_loop_x || trans_y != pre_loop_y){
-			pre_loop_x = trans_x;
-			pre_loop_y = trans_y;
-			loop_count++;
-			std::cout << "ループクロージング" << loop_count << "回目" << std::endl;
-		}
-	}
-}*/
 
 void scan_branch_callback(const sensor_msgs::LaserScan::ConstPtr& scan_Branch_msg){
 	std::vector<float> ranges = scan_Branch_msg->ranges;
@@ -438,69 +393,6 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 		}	
 	}
 }
-
-/*
-//古いバージョン
-void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_angle){
-	int i;
-	float robot_x;
-	float robot_y;
-	float next_robot_x;
-	float next_robot_y;
-	float Branch_dist;
-	float temp_Branch_center_dist;
-	float Branch_center_dist = 10000000000.0;
-	float tmp_goal_x;
-	float tmp_goal_y;
-	float tmp_goal_angle;
-	float debag_robot_x = 0;
-	float debag_robot_y = 0;
-	float debag_next_robot_x = 0;
-	float debag_next_robot_y = 0;
-
-
-//複数の分岐領域を保存できるようにする
-
-	goal_x = 0;
-	goal_y = 0;
-	goal_angle = 0;
-
-	for(i=0;i<fixed_ranges.size()-1;i++){
-		robot_x = fixed_ranges[i]*cos(fixed_angle[i]);
-		next_robot_x = fixed_ranges[i+1]*cos(fixed_angle[i+1]);
-		Branch_dist = std::abs(next_robot_x - robot_x);
-		if(Branch_dist >= Branch_threshold){
-			robot_y = fixed_ranges[i]*sin(fixed_angle[i]);
-			next_robot_y = fixed_ranges[i+1]*sin(fixed_angle[i+1]);
-			temp_Branch_center_dist = std::abs(next_robot_x - robot_x) + std::abs(next_robot_y - robot_y);
-			if(temp_Branch_center_dist < Branch_center_dist){
-				Branch_center_dist = temp_Branch_center_dist;
-				tmp_goal_x = (next_robot_x + robot_x)/2;
-				tmp_goal_y = (next_robot_y + robot_y)/2;
-				tmp_goal_angle = (fixed_angle[i] + fixed_angle[i+1])/2;
-				if(robot_x < Branch_range_limit && next_robot_x < Branch_range_limit){
-					if(std::abs(tmp_goal_y) < branch_y_threshold){
-						debag_robot_x = robot_x;
-						debag_robot_y = robot_y;
-						debag_next_robot_x = next_robot_x;
-						debag_next_robot_y = next_robot_y;
-						goal_x = tmp_goal_x;
-						goal_y = tmp_goal_y;
-						goal_angle = tmp_goal_angle;
-						branch_find_flag = true;
-					}
-				}
-			}
-		}		
-	}
-	
-	goal_x = goal_x - fix_sensor;
-
-	std::cout << "robot_x: " << debag_robot_x << std::endl;
-	std::cout << "robot_y: " << debag_robot_y << std::endl;
-	std::cout << "next_robot_x: " << debag_next_robot_x << std::endl;
-	std::cout << "next_robot_y: " << debag_next_robot_y << std::endl;
-}*/
 
 float VFH_move_angle(std::vector<float> &ranges, float angle_min, float angle_increment, float all_nan, std::vector<float> &angles){
 	float rad_min = all_nan;
@@ -734,106 +626,6 @@ void vel_recovery(){
 	}
 }
 
-/*
-void vel_curve_VFH_e(float rad_min ,float angle_max){
-	const float theta = rad_min;
-	const float v = forward_vel;
-
-	float theta_rho;
-	float omega;
-	float t = 0.3;
-
-	pre_theta = theta;
-
-	theta_rho = 2*theta;
-	omega = theta_rho/t;
-
-	vel.linear.x = v;
-	vel.angular.z = omega;
-
-	std::cout << theta << "(theta_debag)" << std::endl;
-	std::cout << t << "(t_debag)" << std::endl;
-	std::cout << vel.linear.x << "(v_debag)" << std::endl;
-	std::cout << vel.angular.z << "(o_debag)" << std::endl;
-
-	vel_pub.publish(vel);
-	std::cout << "障害物を回避しながら移動中♪" << std::endl;
-
-	odom_queue.callOne(ros::WallDuration(1));
-		
-	odom_log_x.push_back(odom_x);
-	odom_log_y.push_back(odom_y);
-	
-	odom_marking(odom_x,odom_y);
-
-}
-
-void vel_curve_VFH_g(float rad_min ,float angle_max){
-	const float theta = rad_min;
-	const float v = forward_vel;
-
-	float theta_rho;
-	float omega;
-	float t = 1.0;
-
-	pre_theta = theta;
-
-	theta_rho = 2*theta;
-	omega = theta_rho/t;
-
-	vel.linear.x = v;
-	vel.angular.z = omega;
-
-	std::cout << theta << "(theta_debag)" << std::endl;
-	std::cout << t << "(t_debag)" << std::endl;
-	std::cout << vel.linear.x << "(v_debag)" << std::endl;
-	std::cout << vel.angular.z << "(o_debag)" << std::endl;
-
-	vel_pub.publish(vel);
-	std::cout << "障害物を回避しながら移動中♪" << std::endl;
-
-	odom_queue.callOne(ros::WallDuration(1));
-		
-	odom_log_x.push_back(odom_x);
-	odom_log_y.push_back(odom_y);
-	
-	odom_marking(odom_x,odom_y);
-
-}
-
-void vel_curve_VFH(float rad_min ,float angle_max){
-	const float theta = rad_min;
-	const float v = forward_vel;
-	
-	float theta_rho;
-	float omega;
-	float t = 0.5;
-
-	pre_theta = theta;
-
-	theta_rho = 2*theta;
-	omega = theta_rho/t;
-
-	vel.linear.x = v;
-	vel.angular.z = omega;
-
-	std::cout << theta << "(theta_debag)" << std::endl;
-	std::cout << t << "(t_debag)" << std::endl;
-	std::cout << vel.linear.x << "(v_debag)" << std::endl;
-	std::cout << vel.angular.z << "(o_debag)" << std::endl;
-
-	vel_pub.publish(vel);
-	std::cout << "障害物を回避しながら移動中♪" << std::endl;
-
-	odom_queue.callOne(ros::WallDuration(1));
-
-	odom_log_x.push_back(odom_x);
-	odom_log_y.push_back(odom_y);
-	
-	odom_marking(odom_x,odom_y);
-
-}
-*/
 //速度などを引数で使えるようにした速度送信関数
 void vel_curve_VFH2(float theta,float v,float t){
 	float theta_rho;
@@ -1292,15 +1084,10 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 			vel_recovery_g();
 			undecided_rotate = false;
 		}
-		//else{
-			//vel_curve_VFH(Emergency_avoidance*angle_max/6,angle_max);
-			//vel_curve_VFH_e(Emergency_avoidance*angle_max/6,angle_max);
-		//}
 	}
 	else{
 		need_back = true;
 		need_rotate_calc = true;
-		//vel_curve_VFH_g(goal_angle_v, angle_max);
 		vel_curve_VFH2(goal_angle_v,forward_vel,1.0);	
 	}
 }
@@ -1457,7 +1244,6 @@ void road_center_callback(const sensor_msgs::LaserScan::ConstPtr& road_msg){
 
 		display_goal_angle(x_g, y_g);
 
-		//vel_curve_VFH(goal_angle ,-angle_min);
 		vel_curve_VFH2(goal_angle,forward_vel,0.8);
 	}
 	else{
@@ -1505,13 +1291,9 @@ void Branch_area_callback(const sensor_msgs::LaserScan::ConstPtr& Branch_msg){
 	
 	if(branch_find_flag){
 		std::cout << "みーつけた!!" << std::endl;
-		//std::cout << "*****角度 " << goal_angle*180/3.141592 << " [deg] " << " 座標 (" << goal_x << "," << goal_y << ")*****" << std::endl;
 		std::cout << "ロボット座標系 (" << goal_x << "," << goal_y << ")*****" << std::endl;
-		//duplicated_point_detection();
 
-		//if(branch_find_flag){
 		VFH4vel_publish_Branch();
-		//}
 	}
 	else{
 		std::cout << "う〜ん、無いな〜" << std::endl;
@@ -1552,10 +1334,6 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 			vel_recovery();
 			undecided_rotate = false;
 		}
-		//else{
-			//vel_curve_VFH(-Emergency_avoidance*angle_min/6,-angle_min);
-			//vel_curve_VFH_e(-Emergency_avoidance*angle_min/6,-angle_min);
-		//}
 	}
 	else{
 		need_back = true;
@@ -1578,7 +1356,6 @@ void VFH_scan_callback(const sensor_msgs::LaserScan::ConstPtr& VFH_msg){
 
 		display_goal_angle(x_g, y_g);	
 
-		//vel_curve_VFH(m_angle,-angle_min);
 		vel_curve_VFH2(m_angle,forward_vel,0.5);
 	}
 }
@@ -1599,9 +1376,6 @@ int main(int argc, char** argv){
 
 	scan_branch_option = ros::SubscribeOptions::create<sensor_msgs::LaserScan>("/scan",1,scan_branch_callback,ros::VoidPtr(),&scan_branch_queue);
 	scan_branch_sub = s.subscribe(scan_branch_option);
-
-	//tf_option = ros::SubscribeOptions::create<tf2_msgs::TFMessage>("/tf",1,tf_callback,ros::VoidPtr(),&tf_queue);
-	//tf_sub = s.subscribe(tf_option);
 
 	tf_option = ros::SubscribeOptions::create<geometry_msgs::Point>("/odom2map_support",1,tf_callback,ros::VoidPtr(),&tf_queue);
 	tf_sub = s.subscribe(tf_option);

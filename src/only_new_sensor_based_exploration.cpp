@@ -850,7 +850,7 @@ void vel_curve_VFH2(float theta,float v,float t){
 	vel.linear.x = v;
 	vel.angular.z = omega;
 
-	//vel_pub.publish(vel);
+	vel_pub.publish(vel);
 	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
 	odom_queue.callOne(ros::WallDuration(1));

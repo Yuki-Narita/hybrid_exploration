@@ -112,7 +112,7 @@ const float back_time = 0.5;//VFHで全部nanだったときに後退する時�
 const float Branch_threshold = 1.0;//1.0;//分岐領域の判断をする距離差の閾値[m]
 const float Branch_range_limit = 5.0;//分岐領域の判断を行う距離の最大値(分岐がこの値以上遠くにあっても認識しない)[m]
 const float branch_obst_limit = 1.0;//スキャンデータの中心がこの値以下のとき分岐領域を検出しない[m]
-const float fix_sensor = 0.07;//分岐領域座標設定のときにセンサーから取れる距離の誤差を手前に補正(センサー値からマイナスする)[m]
+const float fix_sensor = 0.0;//分岐領域座標設定のときにセンサーから取れる距離の誤差を手前に補正(センサー値からマイナスする)[m]
 //重複探査関連のパラメータ///
 const float duplication_margin = 1.5;//重複探査の判断をするときの半径[m]←正方形の辺の半分の長さでした
 
@@ -377,6 +377,7 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 			}
 			if(duplicated_point_detection()){
 				//std::cout << "重複true" << std::endl;
+				//std::cout << "near:" << near << std::endl;
 				branch_x_list.erase(branch_x_list.begin() + near);
 				//std::cout << "x.erase" << std::endl;
 				branch_y_list.erase(branch_y_list.begin() + near);
@@ -390,7 +391,10 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 				goal_x = goal_x - fix_sensor;
 				break;
 			}
-		}	
+			Branch_center_dist = 10000.0;
+			//std::cout << "ke:" << k << std::endl;
+		}
+		std::cout << "出た" << std::endl;	
 	}
 }
 
@@ -639,7 +643,7 @@ void vel_curve_VFH2(float theta,float v,float t){
 	vel.linear.x = v;
 	vel.angular.z = omega;
 
-	vel_pub.publish(vel);
+	//vel_pub.publish(vel);
 	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
 	odom_queue.callOne(ros::WallDuration(1));
@@ -1430,7 +1434,7 @@ int main(int argc, char** argv){
 		}
 		branch_find_flag = false;
 		find_road_center = false;
-		tf_queue.callOne(ros::WallDuration(1));
+		//tf_queue.callOne(ros::WallDuration(1));
 		std::cout << "loop_count : " << loop_count << std::endl;
 		if(loop_count == loop_closing_max){
 			std::cout << "ループクロージングを" << loop_closing_max << "回したので終了" << std::endl;

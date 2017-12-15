@@ -3,5 +3,5 @@
 	<node pkg="hybrid_exploration" type="hybrid_odometry_on_map" name="hybrid_odometry_on_map" respawn="true" />
 	<node pkg="hybrid_exploration" type="hybrid_odom_support" name="hybrid_odom_support" />
 	<node pkg="hybrid_exploration" type="hybrid_odom_marker" name="hybrid_odom_marker" />
-	<node pkg="hybrid_exploration" type="hybrid_new_vector_explore_program" name="hybrid_new_vector_explore_program" output="screen" />
+	<node pkg="hybrid_exploration" type="hybrid_only_new_vector_explore_program" name="hybrid_only_new_vector_explore_program" output="screen" />
 </launch>

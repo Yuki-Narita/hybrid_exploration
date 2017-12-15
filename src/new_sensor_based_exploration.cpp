@@ -123,7 +123,7 @@ float scan_angle;//この角度の範囲内に空間があれば回転を終了�
 
 const float branch_angle = 0.04;//分岐領域を検出するのに必要な障害物がない空間の角度
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
-const int loop_closing_max = 10;//プログラムを切り替えるために必要なループクロージングの回数
+const int loop_closing_max = 20;//プログラムを切り替えるために必要なループクロージングの回数
 
 float sum_trans = 0;
 

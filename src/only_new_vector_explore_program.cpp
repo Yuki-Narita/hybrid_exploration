@@ -59,6 +59,9 @@ bool stop = false;
 float pre_vector_x = 0;
 float pre_vector_y = 0;
 
+float pre_goal_point_x = 0;
+float pre_goal_point_y = 0;
+
 float goal_point_x;
 float goal_point_y;
 
@@ -756,7 +759,6 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 	}
 	bumper_queue.callOne(ros::WallDuration(1));
 
-
 	if(bumper_hit){
 		vel_recovery();
 	}
@@ -781,7 +783,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 void VFH_navigation(float goal_x, float goal_y){
 	goal_point_x = goal_x;
 	goal_point_y = goal_y;
-	const float goal_margin = 0.7;
+	const float goal_margin = 0.5;
 	float now2goal_dis = 100.0;
 	float pre_now2goal_dis;
 	float sum_diff = 0;
@@ -820,6 +822,10 @@ void VFH_navigation(float goal_x, float goal_y){
 			sum_diff = 0;
 		}
 	}
+
+	pre_goal_point_x = goal_point_x;
+	pre_goal_point_y = goal_point_y;
+
 	std::cout << "目標へ移動終了" << std::endl;
 }
 
@@ -854,6 +860,14 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 	float y_tmp;
 	float dis_tmp;
 	int i;
+
+	
+	//選択の際にpre_goal_pointとの距離の差を計算して、近過ぎたら別の候補にいく
+	//そもそも計算時にスキップする
+	float dist_threshold = 0.3;//前回のゴールからこの距離以下の目標は取らないように
+	float pregoal_to_point;
+	//前回の目標座標  pre_goal_point_x,pre_goal_point_y
+
 
 	std::cout << "start:far_frontier"  << std::endl;
 	
@@ -891,31 +905,35 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 	point_num = 0;
 	first_calc = true;
 
+
 	for(i=0;i<fro_num_tmp;i++){
-		x_tmp = fro_x_tmp[i] - ro_x_map;
-		y_tmp = fro_y_tmp[i] - ro_y_map;
-		dis_tmp = sqrt(pow(x_tmp, 2) + pow(y_tmp,2));
-		dot_tmp = (x_tmp*pre_vector_x + y_tmp*pre_vector_y)/dis_tmp;
-		dot.push_back(dot_tmp);
-		length.push_back(dis_tmp);
-		i_list.push_back(i);
+		pregoal_to_point = sqrt(pow(fro_x_tmp[i]-pre_goal_point_x,2)+pow(fro_y_tmp[i]-pre_goal_point_y,2));
+		if(pregoal_to_point > dist_threshold){
+			x_tmp = fro_x_tmp[i] - ro_x_map;
+			y_tmp = fro_y_tmp[i] - ro_y_map;
+			dis_tmp = sqrt(pow(x_tmp, 2) + pow(y_tmp,2));
+			dot_tmp = (x_tmp*pre_vector_x + y_tmp*pre_vector_y)/dis_tmp;
+			dot.push_back(dot_tmp);
+			length.push_back(dis_tmp);
+			i_list.push_back(i);
 
-		point_num++;
+			point_num++;
 
-		if(first_calc){
-			dot_max = std::abs(dot_tmp);
-			length_max = dis_tmp;
-			first_calc = false;
-		}
-		if(std::abs(dot_tmp)>dot_max){
-			dot_max = std::abs(dot_tmp);
-		}
-		if(dis_tmp>length_max){
-			length_max = dis_tmp;
+			if(first_calc){
+				dot_max = std::abs(dot_tmp);
+				length_max = dis_tmp;
+				first_calc = false;
+			}
+			if(std::abs(dot_tmp)>dot_max){
+				dot_max = std::abs(dot_tmp);
+			}
+			if(dis_tmp>length_max){
+				length_max = dis_tmp;
+			}
 		}
 	}
 
-
+	
 
 	first_calc = true;
 
@@ -1351,7 +1369,7 @@ int main(int argc, char** argv){
 	sleep(1);
 	
 	led1_pub.publish(led1);
-
+	
 	//start_rotate//360[deg]回る//yawの符号が二回変わるまで
 	float pre_yaw = 0;
 	int rotate_count = 0;

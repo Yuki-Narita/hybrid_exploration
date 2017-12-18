@@ -873,6 +873,7 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 	
 	if(fro_num_tmp == 0){
 		std::cout << "未探査座標が無いからskipしたよ"  << std::endl;
+		stop = true;
 		goto skip;
 	}
 
@@ -933,7 +934,11 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 		}
 	}
 
-	
+	if(point_num == 0){
+		std::cout << "未探査座標が無いからskipしたよ"  << std::endl;
+		stop = true;
+		goto skip;
+	}
 
 	first_calc = true;
 

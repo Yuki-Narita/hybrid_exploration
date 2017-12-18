@@ -425,7 +425,7 @@ void vel_curve_VFH2(float theta,float v,float t){
 	vel.linear.x = v;
 	vel.angular.z = omega;
 
-	vel_pub.publish(vel);
+	//vel_pub.publish(vel);
 	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
 	odom_queue.callOne(ros::WallDuration(1));
@@ -751,7 +751,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 	if(first_move){
 		first_move = false;
 	//ここでgra_angle_rが±150度くらいになったら反転する処理を入れる
-		if(std::abs(gra_angle_r) >= 2.62){
+		if(std::abs(gra_angle_r) >= PI/2){
 			reverse();//反転する関数
 			reverse_flag = true;
 			return;
@@ -776,7 +776,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 		need_back = true;
 		need_rotate_calc = true;
 		//vel_curve_VFH(goal_angle, angle_max);
-		vel_curve_VFH2(goal_angle,forward_vel,1.0);		
+		vel_curve_VFH2(goal_angle,forward_vel,0.6);		
 	}
 }
 
@@ -786,8 +786,16 @@ void VFH_navigation(float goal_x, float goal_y){
 	const float goal_margin = 0.5;
 	float now2goal_dis = 100.0;
 	float pre_now2goal_dis;
-	float sum_diff = 0;
-	const float cancel_diff = 0; 
+
+//	float sum_diff = 0;
+//	const float cancel_diff = 0; 
+
+	float diff = 0;
+	int cancel_count = 0;
+	int end_count = 3;
+	int keisu = -1;
+	float diff_th = 0.1;
+
 
 	std::cout << "目標へ移動開始" << std::endl;
 	std::cout << "goal(" << goal_point_x << "," << goal_point_y << ")" << std::endl;
@@ -810,6 +818,22 @@ void VFH_navigation(float goal_x, float goal_y){
 		std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
 		pre_now2goal_dis = now2goal_dis;
 		now2goal_dis = sqrt(pow(goal_point_x-odom_x,2)+pow(goal_point_y-odom_y,2));
+
+		diff +=  now2goal_dis - pre_now2goal_dis;
+		if(std::abs(diff) > diff_th){
+			if(diff*keisu < 0){
+				keisu *= -1;
+				cancel_count++;
+			}
+			diff = 0;
+		}
+		if(cancel_count == end_count){
+			std::cout << "距離が遠くなったためbreak" << std::endl;
+			std::cout << "目標への移動不可" << std::endl;
+			return;
+		}
+
+/*
 		if(pre_now2goal_dis - now2goal_dis < 0){
 			sum_diff += pre_now2goal_dis - now2goal_dis;
 			if(sum_diff < cancel_diff){
@@ -821,6 +845,7 @@ void VFH_navigation(float goal_x, float goal_y){
 		else{
 			sum_diff = 0;
 		}
+*/
 	}
 
 	pre_goal_point_x = goal_point_x;

@@ -1,6 +1,6 @@
 # hybrid_exploration
 * Autonomous SLAM
-* testing on the kobuki
+* testing on the kobuki with kinect
 
 ## run(after activating kobuki and SLAM) <br>
 * hybrid exploration(switch from sensor-based to frontier-based)

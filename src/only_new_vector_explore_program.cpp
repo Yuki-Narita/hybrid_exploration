@@ -707,9 +707,10 @@ void scan_rotate_callback(const sensor_msgs::LaserScan::ConstPtr& src_msg){
 
 
 void reverse(){
-	float reverse_threshold = 0.87;
+	float reverse_threshold = PI/4;
 	//yawとgra_angleの差が小さくなるまで回る
-	vel.angular.z = 0.5;
+	//vel.angular.z = 0.5;
+	vel.angular.z = rotate_vel*(gra_angle-yaw)/std::abs(gra_angle-yaw);
 	vel.linear.x = 0;
 	
 	while(ros::ok() && std::abs(gra_angle-yaw) > reverse_threshold){
@@ -776,7 +777,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 		need_back = true;
 		need_rotate_calc = true;
 		//vel_curve_VFH(goal_angle, angle_max);
-		vel_curve_VFH2(goal_angle,forward_vel,0.6);		
+		vel_curve_VFH2(goal_angle,forward_vel,0.7);		
 	}
 }
 
@@ -973,8 +974,7 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 			EVA = (-(length[i]/length_max));
 		}
 		else{
-			EVA = ((dot[i]/dot_max)-(length[i]/length_max));
-		}
+			EVA = ((dot[i]/dot_max)-1.5*(length[i]/length_max));		}
 
 		if(first_calc){
 			EVA_max = EVA;

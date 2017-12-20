@@ -1102,8 +1102,15 @@ void VFH4vel_publish_Branch(){
 	const float gra_force = 6.0;
 	float now2goal_dis =100;
 	float pre_now2goal_dis;
-	float sum_diff = 0;
-	const float cancel_diff = 0; 
+	//float sum_diff = 0;
+	//const float cancel_diff = 0;
+
+	float diff = 0;
+	int cancel_count = 0;
+	int end_count = 1;
+	int keisu = -1;
+	float diff_th = 0.1;
+ 
 
 	//ここでgoal_y情報からLEDを点灯
 	kobuki_msgs::Led led;
@@ -1137,6 +1144,22 @@ void VFH4vel_publish_Branch(){
 		std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
 		pre_now2goal_dis = now2goal_dis;
 		now2goal_dis = sqrt(pow(goal_point_x-odom_x,2)+pow(goal_point_y-odom_y,2));
+
+		diff +=  now2goal_dis - pre_now2goal_dis;
+		if(std::abs(diff) > diff_th){
+			if(diff*keisu < 0){
+				keisu *= -1;
+				cancel_count++;
+			}
+			diff = 0;
+		}
+		if(cancel_count == end_count){
+			std::cout << "距離が遠くなったためbreak" << std::endl;
+			std::cout << "目標への移動不可" << std::endl;
+			break;
+		}
+
+/*
 		if(pre_now2goal_dis - now2goal_dis < 0){
 			sum_diff += pre_now2goal_dis - now2goal_dis;
 			if(sum_diff < cancel_diff){
@@ -1147,6 +1170,7 @@ void VFH4vel_publish_Branch(){
 		else{
 			sum_diff = 0;
 		}
+*/
 	}
 	
 	while(now2goal_dis > goal_margin && ros::ok()){
@@ -1156,6 +1180,21 @@ void VFH4vel_publish_Branch(){
 		std::cout << "now(" << odom_x << "," << odom_y << ")\n" << std::endl;
 		pre_now2goal_dis = now2goal_dis;
 		now2goal_dis = sqrt(pow(goal_point_x-odom_x,2)+pow(goal_point_y-odom_y,2));
+
+		diff +=  now2goal_dis - pre_now2goal_dis;
+		if(std::abs(diff) > diff_th){
+			if(diff*keisu < 0){
+				keisu *= -1;
+				cancel_count++;
+			}
+			diff = 0;
+		}
+		if(cancel_count == end_count){
+			std::cout << "距離が遠くなったためbreak" << std::endl;
+			std::cout << "目標への移動不可" << std::endl;
+			break;
+		}
+/*
 		if(pre_now2goal_dis - now2goal_dis < 0){
 			sum_diff += pre_now2goal_dis - now2goal_dis;
 			if(sum_diff < cancel_diff){
@@ -1166,6 +1205,7 @@ void VFH4vel_publish_Branch(){
 		else{
 			sum_diff = 0;
 		}
+*/
 	}
 
 	std::cout << "目標へ移動終了" << std::endl;

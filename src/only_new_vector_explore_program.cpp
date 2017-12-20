@@ -425,7 +425,7 @@ void vel_curve_VFH2(float theta,float v,float t){
 	vel.linear.x = v;
 	vel.angular.z = omega;
 
-	//vel_pub.publish(vel);
+	vel_pub.publish(vel);
 	std::cout << "障害物を回避しながら移動中♪" << std::endl;
 
 	odom_queue.callOne(ros::WallDuration(1));
@@ -1403,7 +1403,7 @@ int main(int argc, char** argv){
 	//start_rotate//360[deg]回る//yawの符号が二回変わるまで
 	float pre_yaw = 0;
 	int rotate_count = 0;
-	vel.angular.z = rotate_vel;
+	vel.angular.z = 0.3;
 	while(rotate_count < 2){
 		vel_pub.publish(vel);
 		odom_queue.callOne(ros::WallDuration(1));

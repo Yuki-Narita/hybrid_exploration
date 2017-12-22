@@ -15,6 +15,8 @@
 ros::Publisher vel_pub;
 ros::Publisher marker_pub;
 ros::Publisher which_pub;
+ros::Publisher led1_pub;
+ros::Publisher led2_pub;
 
 ros::CallbackQueue bumper_queue;
 ros::SubscribeOptions bumper_option;
@@ -46,6 +48,7 @@ ros::Subscriber scan_rotate_sub;
 
 geometry_msgs::Twist vel;
 visualization_msgs::Marker marker3;
+kobuki_msgs::Led led2;
 
 float Emergency_avoidance = 0;
 bool undecided_rotate = false;
@@ -784,7 +787,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 void VFH_navigation(float goal_x, float goal_y){
 	goal_point_x = goal_x;
 	goal_point_y = goal_y;
-	const float goal_margin = 0.5;
+	const float goal_margin = 0.8;//0.5;
 	float now2goal_dis = 100.0;
 	float pre_now2goal_dis;
 
@@ -1003,6 +1006,16 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 	std::cout << "現在座標 (" << ro_x_map << "," << ro_y_map <<  ")" <<std::endl;
 
 ////////////////////////*******//ここで経路作成関数に目標を渡す///******////////////////////////////////
+	//目標が決まるたびにLEDの色を変える
+	if(led2.value < 3){
+		led2.value++;
+	}
+	else{
+		led2.value = 1;
+	}
+	led2_pub.publish(led2);
+
+
 	VFH_navigation(fro_x_tmp[goal_num], fro_y_tmp[goal_num]);
 
 	odom_queue.callOne(ros::WallDuration(1));
@@ -1393,10 +1406,11 @@ int main(int argc, char** argv){
 	pre_vector_y = sin(yaw);
 
 
-	ros::Publisher led1_pub;
 	led1_pub = f.advertise<kobuki_msgs::Led>("/mobile_base/commands/led1", 1);
+	led2_pub = f.advertise<kobuki_msgs::Led>("/mobile_base/commands/led2", 1);
 	kobuki_msgs::Led led1;
 	led1.value = 3;
+	led2.value = 0;
 	
 	sleep(1);
 	

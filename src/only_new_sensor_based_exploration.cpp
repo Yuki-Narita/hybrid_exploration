@@ -117,7 +117,7 @@ const float fix_sensor = 0.0;//分岐領域座標設定のときにセンサー�
 const float duplication_margin = 1.5;//重複探査の判断をするときの半径[m]←正方形の辺の半分の長さでした
 
 const float scan_branch_limit = 1.5;//分岐方向への回転をセンサデータから行うときにこの値以上だったら数値があっても良い
-const float branch_y_threshold = 4.0;//分岐領域の2点間のｙ座標の差がこの値以下のとき分岐として検出
+//const float branch_y_threshold = 4.0;//分岐領域の2点間のｙ座標の差がこの値以下のとき分岐として検出
 
 float scan_angle;//この角度の範囲内に空間があれば回転を終了する
 
@@ -364,7 +364,7 @@ bool duplicated_point_detection(){
 
 //その時刻に見つけた分岐領域を全て保存できるように変更する
 
-void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_angle){
+void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_angle,float max_angle){
 	int i;
 	int j;
 	int near;
@@ -372,11 +372,17 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 	float robot_y;
 	float next_robot_x;
 	float next_robot_y;
-	float Branch_dist;
+	float Branch_x_dist;
 	float temp_Branch_center_dist;
 	float Branch_center_dist = 10000000000.0;
 	float tmp_goal_x;
 	float tmp_goal_y;
+
+	float Branch_y_dist;
+
+	//分岐のy座標の差がこの値の範囲内の場合のみ分岐として検出
+	const float branch_y_low = Branch_threshold*tan(max_angle);
+	const float branch_y_high = Branch_range_limit*tan(max_angle);//分岐領域の2点間のｙ座標の差がこの値以下のとき分岐として検出
 
 	std::vector<float> branch_x_list;//goal_xを保存
 	std::vector<float> branch_y_list;//goal_yを保存
@@ -392,13 +398,16 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 		robot_x = fixed_ranges[i]*cos(fixed_angle[i]);
 		next_robot_x = fixed_ranges[i+1]*cos(fixed_angle[i+1]);
 		if(robot_x <= Branch_range_limit && next_robot_x <= Branch_range_limit){
-			Branch_dist = std::abs(next_robot_x - robot_x);
-			if(Branch_dist >= Branch_threshold){
+			Branch_x_dist = std::abs(next_robot_x - robot_x);
+			if(Branch_x_dist >= Branch_threshold){
 				robot_y = fixed_ranges[i]*sin(fixed_angle[i]);
 				next_robot_y = fixed_ranges[i+1]*sin(fixed_angle[i+1]);
-				tmp_goal_y = (next_robot_y + robot_y)/2;
-				if(std::abs(tmp_goal_y) <= branch_y_threshold){//branch_y_thresholdは大きめにしてもいいかも
+				Branch_y_dist = std::abs(next_robot_y - robot_y);
+				//tmp_goal_y = (next_robot_y + robot_y)/2;
+				//if(std::abs(tmp_goal_y) <= branch_y_threshold){//branch_y_thresholdは大きめにしてもいいかも
+				if(branch_y_low <= Branch_y_dist && Branch_y_dist <= branch_y_high){
 					tmp_goal_x = (next_robot_x + robot_x)/2;
+					tmp_goal_y = (next_robot_y + robot_y)/2;
 					branch_x_list.push_back(tmp_goal_x);
 					branch_y_list.push_back(tmp_goal_y);
 					branch_find_flag = true;
@@ -1542,7 +1551,7 @@ void Branch_area_callback(const sensor_msgs::LaserScan::ConstPtr& Branch_msg){
 	std::cout << "分岐領域どこだろ〜" << std::endl;
 	std::cout << "・・・・・・" << std::endl;
 
-	Branch_search(fixed_ranges,fixed_angle);
+	Branch_search(fixed_ranges,fixed_angle,-angle_min);
 
 	std::cout << "・・・・・・" << std::endl;		
 	

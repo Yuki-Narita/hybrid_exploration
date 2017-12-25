@@ -894,7 +894,7 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 	
 	//選択の際にpre_goal_pointとの距離の差を計算して、近過ぎたら別の候補にいく
 	//そもそも計算時にスキップする
-	float dist_threshold = 0.3;//前回のゴールからこの距離以下の目標は取らないように
+	float dist_threshold = 1.0;//前回のゴールからこの距離以下の目標は取らないように
 	float pregoal_to_point;
 	//前回の目標座標  pre_goal_point_x,pre_goal_point_y
 
@@ -978,7 +978,7 @@ void choose_goal_frontier(std::vector<float> fro_x, std::vector<float> fro_y, in
 			EVA = (-(length[i]/length_max));
 		}
 		else{
-			EVA = ((dot[i]/dot_max)-1.5*(length[i]/length_max));
+			EVA = ((dot[i]/dot_max)-2.0*(length[i]/length_max));
 		}
 
 		if(first_calc){

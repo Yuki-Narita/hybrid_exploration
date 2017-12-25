@@ -1254,7 +1254,7 @@ void road_center_callback(const sensor_msgs::LaserScan::ConstPtr& road_msg){
 	std::vector<float> fixed_angle;
 	float goal_angle;
 
-	//float rc_threthold = 5.0;
+	float rc_threthold = Branch_range_limit;
 
 	float x_g;
 	float y_g;
@@ -1264,8 +1264,10 @@ void road_center_callback(const sensor_msgs::LaserScan::ConstPtr& road_msg){
 
 	for(int i=0;i<ranges.size();i++){
 		if(!isnan(ranges[i])){
-			fixed_ranges.push_back(ranges[i]);
-			fixed_angle.push_back(angle_min+(angle_increment*i));
+			if(ranges[i]*cos(angle_min+(angle_increment*i)) <= rc_threthold){
+				fixed_ranges.push_back(ranges[i]);
+				fixed_angle.push_back(angle_min+(angle_increment*i));
+			}
 		}
 	}
 

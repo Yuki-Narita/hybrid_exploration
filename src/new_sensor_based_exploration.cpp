@@ -122,7 +122,7 @@ float scan_angle;//この角度の範囲内に空間があれば回転を終了�
 
 const float branch_angle = 0.04;//分岐領域を検出するのに必要な障害物がない空間の角度
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
-const int loop_closing_max = 15;//プログラムを切り替えるために必要なループクロージングの回数
+const int loop_closing_max = 20;//プログラムを切り替えるために必要なループクロージングの回数
 
 float sum_trans = 0;
 
@@ -370,6 +370,7 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 		}
 	}
 
+
 	if(branch_find_flag){
 		//std::cout << "size:" << branch_x_list.size() << std::endl;
 		for(int k=branch_x_list.size();k>0;k--){
@@ -398,6 +399,7 @@ void Branch_search(std::vector<float> &fixed_ranges,std::vector<float> &fixed_an
 				branch_find_flag = true;
 				goal_x = goal_x - fix_sensor;
 				break;
+
 			}
 			Branch_center_dist = 10000.0;
 			//std::cout << "ke:" << k << std::endl;
@@ -1271,7 +1273,6 @@ void road_center_callback(const sensor_msgs::LaserScan::ConstPtr& road_msg){
 		//std::cout << "skip(debag)" << std::endl;
 		return;
 	}
-
 
 	goal_angle = road_center_search(fixed_ranges,fixed_angle);	
 	

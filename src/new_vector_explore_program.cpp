@@ -89,7 +89,7 @@ const float forward_vel = 0.2;//前進速度[m/s]
 const float rotate_vel = 0.5;//回転速度[rad\s]
 const float obst_recover_angle = 0.09;//リカバリー回転のときこの角度の±の範囲に障害物がなければ回転終了
 const float forward_dis = 0.75;//一回のVFHで前方向に進む距離[m]
-const float scan_threshold = 1.2;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
+const float scan_threshold = 0.8;//VFHでの前方の安全確認距離(この距離以内に障害物がなければ安全と判断)[m]
 const float safe_space = 0.6;//ロボットの直径(VFHでこの値以上に空間があれば安全と判断)[m]
 
 bool bumper_hit = false;
@@ -787,7 +787,7 @@ void VFH_gravity(const sensor_msgs::LaserScan::ConstPtr& scan_msg){//引力の�
 void VFH_navigation(float goal_x, float goal_y){
 	goal_point_x = goal_x;
 	goal_point_y = goal_y;
-	const float goal_margin = 0.8;//0.5;
+	const float goal_margin = 1.0;//0.8;//0.5;
 	float now2goal_dis = 100.0;
 	float pre_now2goal_dis;
 
@@ -796,7 +796,7 @@ void VFH_navigation(float goal_x, float goal_y){
 
 	float diff = 0;
 	int cancel_count = 0;
-	int end_count = 3;
+	int end_count = 1;
 	int keisu = -1;
 	float diff_th = 0.1;
 	

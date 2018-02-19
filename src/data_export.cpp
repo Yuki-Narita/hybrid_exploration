@@ -17,10 +17,16 @@ double odom_x;
 double odom_y;
 double explored_cell;
 
+ros::Time start;
+ros::Time process;
+
 
 void export_data(){
 	std::ofstream ofs("export_data.csv",std::ios::app);
-	ofs << odom_x << "," << odom_y << "," << explored_cell << std::endl;
+	//ofs << odom_x << "," << odom_y << "," << explored_cell << std::endl;
+	ros::Duration sec = process - start;
+	double time = sec.toSec();;
+	ofs << time << "," << explored_cell << std::endl;
 }
 
 void map_data(const nav_msgs::OccupancyGrid::ConstPtr& map_data){
@@ -31,6 +37,8 @@ void map_data(const nav_msgs::OccupancyGrid::ConstPtr& map_data){
 	double m_per_cell = info.resolution;
 
 	int explored_cell_num = 0;
+
+	
 
 	for(int i=0;i<map_data->data.size();i++){
 	//for(int i=0;i<data.size();i++){
@@ -58,6 +66,7 @@ int main(int argc, char** argv){
 	odom_data_sub = d.subscribe(odom_data_option);
 	map_data_sub = d.subscribe(map_data_option);
 
+
 	time_t timer;
    	struct tm *local;
    	timer = time(NULL);
@@ -66,16 +75,20 @@ int main(int argc, char** argv){
 	std::ofstream ofs("export_data.csv",std::ios::app);
 	
 	ofs << local->tm_year+1900 << "/" << local->tm_mon+1 << "/" << local->tm_mday << " " << local->tm_hour << ":" << local->tm_min << ":" << local->tm_sec << std::endl;
-	ofs << "odom_x,odom_y,探査済み面積[m*m]" << std::endl;
+	//ofs << "odom_x,odom_y,探査済み面積[m*m]" << std::endl;
+	ofs << "time,探査済み面積[m*m]" << std::endl;
 
 
-	ros::Rate rate(0.5);
+	//ros::Rate rate(0.5);
+
+	start = ros::Time::now();
 
 	while(ros::ok()){
-		odom_data_queue.callOne(ros::WallDuration(1));
+		//odom_data_queue.callOne(ros::WallDuration(1));
+		process = ros::Time::now();
 		map_data_queue.callOne(ros::WallDuration(1));
 		export_data();
-		rate.sleep();
+		//rate.sleep();
 	}
 
 	ofs << "" << std::endl;

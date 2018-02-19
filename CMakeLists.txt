@@ -243,3 +243,6 @@ target_link_libraries(hybrid_odom_marker ${catkin_LIBRARIES})
 
 add_executable(hybrid_loop_test src/loop_test.cpp)
 target_link_libraries(hybrid_loop_test ${catkin_LIBRARIES})
+
+add_executable(hybrid_maptopic_converter src/maptopic_converter.cpp)
+target_link_libraries(hybrid_maptopic_converter ${catkin_LIBRARIES})

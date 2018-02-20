@@ -1,7 +1,6 @@
 #include <ros/ros.h>
 #include <ros/callback_queue.h>
 #include <nav_msgs/OccupancyGrid.h>
-#include <unistd.h>
 
 ros::CallbackQueue mtc_queue;
 ros::Subscriber mtc_sub;
@@ -18,7 +17,7 @@ void mtc_callback(const nav_msgs::OccupancyGrid::ConstPtr& mtc_msg){
 
 int main(int argc, char** argv){
 
-	ros::init(argc, argv, "ros1robot_maptopic_converter");//ロボットによって書き換え
+	ros::init(argc, argv, "maptopic_converter");
 	ros::NodeHandle mtc;
 
 	mtc_pub = mtc.advertise<nav_msgs::OccupancyGrid>("/ros1robot/map", 1);//ロボットによって書き換え

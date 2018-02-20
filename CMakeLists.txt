@@ -246,3 +246,6 @@ target_link_libraries(hybrid_loop_test ${catkin_LIBRARIES})
 
 add_executable(hybrid_maptopic_converter src/maptopic_converter.cpp)
 target_link_libraries(hybrid_maptopic_converter ${catkin_LIBRARIES})
+
+add_executable(hybrid_maptopic_converter_support src/maptopic_converter_support.cpp)
+target_link_libraries(hybrid_maptopic_converter_support ${catkin_LIBRARIES})
